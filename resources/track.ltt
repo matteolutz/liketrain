@@ -1,0 +1,9 @@
+S23:    -> switch(M)            | <- back(N, right)
+S25:    -> back(L, left)        | <- back(M, right)
+S26:    -> none                 | <- back(M, left)
+S22:    -> switch(N)            | <- switch(O)
+S8:     -> back(O, right)       | <- none
+S21:    -> back(O, left)        | <- switch(P)
+S24:    -> back(N, left)        | <- back(P, right)
+S20:    -> back(L, right)       | <- back(P, left)
+S13:    -> none                 | <- switch(L)

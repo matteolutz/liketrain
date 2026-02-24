@@ -1,0 +1,12 @@
+use thiserror::Error;
+
+use crate::{SectionId, SwitchId};
+
+#[derive(Error, Debug)]
+pub enum TrackError {
+    #[error("The section with id {0} was not found")]
+    SectionNotFound(SectionId),
+
+    #[error("The switch with id {0} was not found")]
+    SwitchNotFound(SwitchId),
+}
