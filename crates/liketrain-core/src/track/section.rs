@@ -1,5 +1,33 @@
 use crate::{Connection, Direction};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SectionEnd {
+    /// The start of the section. Going forward means getting to the end.
+    Start,
+
+    /// The end of the section. Going backward means getting to the start.
+    End,
+}
+
+impl SectionEnd {
+    /// The end you will reach, when driving in the given direction.
+    pub fn end_when(direction: Direction) -> Self {
+        match direction {
+            Direction::Forward => SectionEnd::End,
+            Direction::Backward => SectionEnd::Start,
+        }
+    }
+}
+
+impl std::fmt::Display for SectionEnd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SectionEnd::Start => write!(f, "start"),
+            SectionEnd::End => write!(f, "end"),
+        }
+    }
+}
+
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SectionId(usize);
 
@@ -19,14 +47,10 @@ impl std::fmt::Display for SectionId {
 
 #[derive(Debug)]
 pub struct Section {
-    name: String,
+    pub(super) name: String,
 
     forward: Connection,
     backward: Connection,
-
-    /// The layer of the section in the track layout.
-    /// This is only used to render different physical layers of the track seperately.
-    layer: usize,
 }
 
 impl Section {
@@ -36,9 +60,11 @@ impl Section {
 
             forward: Connection::default(),
             backward: Connection::default(),
-
-            layer: 0,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn set_connection(&mut self, direction: Direction, connection: Connection) {

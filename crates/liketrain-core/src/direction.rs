@@ -12,3 +12,12 @@ impl Direction {
         }
     }
 }
+
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Direction::Forward => write!(f, "forward"),
+            Direction::Backward => write!(f, "backward"),
+        }
+    }
+}

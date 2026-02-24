@@ -1,15 +1,21 @@
-use crate::{SectionId, SwitchId};
+use crate::{SectionEnd, SectionId, SwitchId, SwitchState};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub enum Connection {
-    Straight {
+    Direct {
         to: SectionId,
+
+        /// The end of the current section that this connected to `to`.
+        section_end: SectionEnd,
     },
+
     Switch {
         switch_id: SwitchId,
     },
+
     SwitchBack {
         switch_id: SwitchId,
+        required_state: SwitchState,
     },
 
     #[default]

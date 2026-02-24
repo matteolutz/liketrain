@@ -1,4 +1,4 @@
-use crate::SectionId;
+use crate::{SectionEnd, SectionId, Track};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SwitchId(usize);
@@ -36,45 +36,95 @@ impl std::fmt::Display for SwitchState {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SwitchConnection {
+    Section {
+        section_id: SectionId,
+
+        /// Which end of the section the switch is connected to.
+        section_end: SectionEnd,
+    },
+
+    SwitchBack {
+        switch_id: SwitchId,
+        state: SwitchState,
+    },
+}
+
+impl SwitchConnection {
+    pub fn section(section_id: SectionId, section_end: SectionEnd) -> Self {
+        Self::Section {
+            section_id,
+            section_end,
+        }
+    }
+}
+
+impl SwitchConnection {
+    pub const INVALID: Self = Self::Section {
+        section_id: SectionId::INVALID,
+        section_end: SectionEnd::Start,
+    };
+}
+
 #[derive(Debug)]
 pub struct Switch {
-    name: String,
+    pub(super) name: String,
 
-    pub(super) from: SectionId,
+    pub(super) from: SwitchConnection,
 
-    pub(super) to_left: SectionId,
-    pub(super) to_right: SectionId,
+    pub(super) to_left: SwitchConnection,
+    pub(super) to_right: SwitchConnection,
 }
 
 impl Switch {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            from: SectionId::INVALID,
-            to_left: SectionId::INVALID,
-            to_right: SectionId::INVALID,
+            from: SwitchConnection::INVALID,
+            to_left: SwitchConnection::INVALID,
+            to_right: SwitchConnection::INVALID,
         }
     }
 
-    pub fn from(&self) -> SectionId {
+    pub fn from(&self) -> SwitchConnection {
         self.from
     }
 
-    pub fn set_from(&mut self, from: SectionId) {
-        self.from = from;
+    pub fn set_from(&mut self, from: impl Into<SwitchConnection>) {
+        self.from = from.into();
     }
 
-    pub fn set_to(&mut self, to: SectionId, state: SwitchState) {
+    pub fn set_to(&mut self, to: impl Into<SwitchConnection>, state: SwitchState) {
         match state {
-            SwitchState::Left => self.to_left = to,
-            SwitchState::Right => self.to_right = to,
+            SwitchState::Left => self.to_left = to.into(),
+            SwitchState::Right => self.to_right = to.into(),
         }
     }
 
-    pub fn to(&self, state: SwitchState) -> SectionId {
+    pub fn to(&self, state: SwitchState) -> SwitchConnection {
         match state {
             SwitchState::Left => self.to_left,
             SwitchState::Right => self.to_right,
         }
+    }
+
+    /// The section id this switch belongs to.
+    /// This is very important to know because we can only power sections.
+    pub fn section_id(&self, track: &Track) -> SectionId {
+        match &self.from {
+            SwitchConnection::Section { section_id, .. } => *section_id,
+            SwitchConnection::SwitchBack { switch_id, .. } => {
+                let switch = track.switch(switch_id).unwrap();
+                switch.section_id(track)
+            }
+        }
+    }
+
+    pub fn pretty_print(&self, track: &Track) -> String {
+        let section_id = self.section_id(track);
+        let section = track.section(&section_id).unwrap();
+
+        format!("switch {} (powered by section {})", self.name, section.name)
     }
 }

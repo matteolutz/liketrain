@@ -9,31 +9,33 @@ pub use connection::*;
 mod switch;
 pub use switch::*;
 
+mod transition;
+pub use transition::*;
+
 mod error;
 pub use error::*;
 
 use crate::Direction;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Track {
     sections: HashMap<SectionId, Section>,
     switches: HashMap<SwitchId, Switch>,
 }
 
 impl Track {
-    pub fn new() -> Self {
-        Self {
-            sections: HashMap::new(),
-            switches: HashMap::new(),
-        }
-    }
-
     pub fn section(&self, section_id: &SectionId) -> Option<&Section> {
         self.sections.get(section_id)
     }
 
     pub fn section_mut(&mut self, section_id: &SectionId) -> Option<&mut Section> {
         self.sections.get_mut(section_id)
+    }
+
+    pub fn section_id(&self, section_name: &str) -> Option<SectionId> {
+        self.sections
+            .iter()
+            .find_map(|(id, section)| (section.name == section_name).then_some(*id))
     }
 
     pub fn insert_section(&mut self, section: Section) -> SectionId {
@@ -56,6 +58,10 @@ impl Track {
         self.switches.get_mut(switch_id)
     }
 
+    pub fn switch_section_id(&self, switch_id: &SwitchId) -> Option<SectionId> {
+        self.switch(switch_id).map(|switch| switch.section_id(self))
+    }
+
     pub fn insert_switch(&mut self, switch: Switch) -> SwitchId {
         let id = self
             .switches
@@ -70,11 +76,53 @@ impl Track {
 }
 
 impl Track {
-    pub fn next_sections(
+    fn make_switch_transition(
+        &self,
+        switch_connection: SwitchConnection,
+    ) -> Vec<SectionTransition> {
+        match switch_connection {
+            SwitchConnection::Section {
+                section_id,
+                section_end,
+            } => {
+                vec![SectionTransition::direct(section_id, section_end)]
+            }
+
+            SwitchConnection::SwitchBack { switch_id, state } => {
+                let Some(switch) = self.switches.get(&switch_id) else {
+                    return vec![];
+                };
+
+                self.make_switch_transition(switch.from())
+                    .into_iter()
+                    .map(|trans| SectionTransition::switch_back(switch_id, state, trans))
+                    .collect()
+            }
+        }
+    }
+
+    /// Get the transitions from a section into a neighbouring section in a given direction.
+    pub fn transitions_to(
         &self,
         current_section: SectionId,
         direction: Direction,
-    ) -> Result<Vec<SectionId>, TrackError> {
+        target_section: SectionId,
+    ) -> Result<Vec<SectionTransition>, TrackError> {
+        self.transitions(current_section, direction)
+            .map(|transitions| {
+                transitions
+                    .into_iter()
+                    .filter(|trans| trans.destination() == target_section)
+                    .collect()
+            })
+    }
+
+    /// Get all transitions from a section in a given direction.
+    pub fn transitions(
+        &self,
+        current_section: SectionId,
+        direction: Direction,
+    ) -> Result<Vec<SectionTransition>, TrackError> {
         let section = self
             .sections
             .get(&current_section)
@@ -83,23 +131,44 @@ impl Track {
         let connection = section.connection(direction);
 
         let next_sections = match connection {
-            Connection::Straight { to } => vec![*to],
+            Connection::Direct {
+                to,
+                section_end: end,
+            } => vec![SectionTransition::direct(*to, *end)],
+
             Connection::Switch { switch_id } => {
                 let switch = self
                     .switches
                     .get(switch_id)
                     .ok_or(TrackError::SwitchNotFound(*switch_id))?;
 
-                vec![switch.to_left, switch.to_right]
+                let left_transitions = self
+                    .make_switch_transition(switch.to(SwitchState::Left))
+                    .into_iter()
+                    .map(|trans| SectionTransition::switch(*switch_id, SwitchState::Left, trans));
+                let right_transitions = self
+                    .make_switch_transition(switch.to(SwitchState::Right))
+                    .into_iter()
+                    .map(|trans| SectionTransition::switch(*switch_id, SwitchState::Right, trans));
+
+                left_transitions.chain(right_transitions).collect()
             }
-            Connection::SwitchBack { switch_id } => {
+
+            Connection::SwitchBack {
+                switch_id,
+                required_state,
+            } => {
                 let switch = self
                     .switches
                     .get(switch_id)
                     .ok_or(TrackError::SwitchNotFound(*switch_id))?;
 
-                vec![switch.from]
+                self.make_switch_transition(switch.from)
+                    .into_iter()
+                    .map(|trans| SectionTransition::switch_back(*switch_id, *required_state, trans))
+                    .collect()
             }
+
             Connection::None => vec![],
         };
 

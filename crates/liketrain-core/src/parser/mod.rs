@@ -11,7 +11,7 @@ use crate::SwitchState;
 mod tests;
 
 pub fn parser<'src>()
--> impl Parser<'src, &'src str, Vec<SectionDef<'src>>, extra::Err<Rich<'src, char>>> {
+-> impl Parser<'src, &'src str, Vec<TrackDefinition<'src>>, extra::Err<Rich<'src, char>>> {
     let comment = just('#')
         .padded()
         .ignore_then(any().filter(|c| *c != '\n').repeated())
@@ -39,6 +39,17 @@ pub fn parser<'src>()
         .ignore_then(ident.delimited_by(just('('), just(')')))
         .map(|switch_name| ConnectionExpr::Switch { switch_name });
 
+    //  switch(A, left)
+    let switch_with_sate = just("switch")
+        .padded()
+        .ignore_then(
+            ident
+                .then_ignore(just(',').padded())
+                .then(switch_state)
+                .delimited_by(just('('), just(')')),
+        )
+        .map(|(switch_name, state)| SwitchWithState { switch_name, state });
+
     // back(A, left)
     let back = just("back")
         .padded()
@@ -57,7 +68,7 @@ pub fn parser<'src>()
 
     let connection_expr = none.or(direct).or(switch).or(back);
 
-    let section = ident
+    let section_def = ident
         .then_ignore(just(':').padded())
         .then_ignore(just("->").padded())
         .then(connection_expr.clone())
@@ -70,9 +81,15 @@ pub fn parser<'src>()
             backward,
         });
 
-    section
-        .padded_by(ws)
-        .repeated()
-        .collect()
-        .then_ignore(end())
+    let switch_def = switch_with_sate
+        .padded()
+        .then_ignore(just("->").padded())
+        .then(switch_with_sate)
+        .map(|(from, to)| SwitchConnection { from, to });
+
+    let def = section_def
+        .map(TrackDefinition::Section)
+        .or(switch_def.map(TrackDefinition::Switch));
+
+    def.padded_by(ws).repeated().collect().then_ignore(end())
 }
