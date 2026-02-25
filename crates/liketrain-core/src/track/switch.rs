@@ -1,9 +1,18 @@
 use std::sync::Arc;
 
+use liketrain_hardware::event::HardwareSwitchState;
+
 use crate::{SectionEnd, SectionId, Track};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SwitchId(Arc<String>);
+
+impl SwitchId {
+    pub fn matches(&self, other: impl AsRef<str>) -> bool {
+        let other = other.as_ref();
+        other == self.0.as_ref()
+    }
+}
 
 impl<T: AsRef<str>> From<T> for SwitchId {
     fn from(value: T) -> Self {
@@ -21,6 +30,15 @@ impl std::fmt::Display for SwitchId {
 pub enum SwitchState {
     Left,
     Right,
+}
+
+impl From<HardwareSwitchState> for SwitchState {
+    fn from(value: HardwareSwitchState) -> Self {
+        match value {
+            HardwareSwitchState::Left => Self::Left,
+            HardwareSwitchState::Right => Self::Right,
+        }
+    }
 }
 
 impl std::fmt::Display for SwitchState {

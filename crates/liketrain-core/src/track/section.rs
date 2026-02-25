@@ -49,6 +49,18 @@ impl std::fmt::Display for SectionId {
     }
 }
 
+impl From<usize> for SectionId {
+    fn from(id: usize) -> Self {
+        SectionId(id)
+    }
+}
+
+impl From<u32> for SectionId {
+    fn from(id: u32) -> Self {
+        SectionId(id as usize)
+    }
+}
+
 #[derive(Debug)]
 pub struct Section {
     pub(super) name: String,

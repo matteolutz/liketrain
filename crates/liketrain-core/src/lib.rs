@@ -13,3 +13,6 @@ pub use train::*;
 pub mod parser;
 
 pub mod serial;
+
+mod controller;
+pub use controller::*;
