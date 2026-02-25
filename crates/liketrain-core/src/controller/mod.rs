@@ -102,6 +102,7 @@ impl Controller {
         if inbound_trains.len() == 1 {
             // it's just one train, so this must be the train that just entered this section
             inbound_trains[0].entered_section(section_id);
+            // TODO: probably schedule a TrainEnteredSection event of some sort, which then triggers the switches etc.
             return;
         }
 
