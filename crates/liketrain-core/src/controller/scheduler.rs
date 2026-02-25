@@ -18,7 +18,7 @@ impl Ord for TimedEvent {
 
 impl PartialOrd for TimedEvent {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.when.partial_cmp(&self.when)
+        Some(self.cmp(other))
     }
 }
 
@@ -34,6 +34,15 @@ impl Eq for TimedEvent {}
 pub struct Scheduler(BinaryHeap<TimedEvent>);
 
 impl Scheduler {
+    pub fn schedule(&mut self, when: time::Instant, event: impl Into<ScheduledEvent>) {
+        let event = event.into();
+        self.0.push(TimedEvent { when, event });
+    }
+
+    pub fn schedule_now(&mut self, event: impl Into<ScheduledEvent>) {
+        self.schedule(time::Instant::now(), event);
+    }
+
     pub fn next_event_duration(&self) -> Option<Duration> {
         self.0.peek().map(|event| {
             let now = time::Instant::now();

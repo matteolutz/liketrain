@@ -63,10 +63,6 @@ impl Track {
         self.switch(switch_id).map(|switch| switch.section_id(self))
     }
 
-    pub fn find_switch_id(&self, f: impl Fn(&SwitchId) -> bool) -> Option<SwitchId> {
-        self.switches.keys().find(|id| f(id)).cloned()
-    }
-
     pub fn insert_switch(
         &mut self,
         switch_id: impl Into<SwitchId>,

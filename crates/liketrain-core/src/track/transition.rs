@@ -54,6 +54,14 @@ impl SectionTransition {
             Self::SwitchBack { to, .. } => to.destination(),
         }
     }
+
+    pub fn destination_section_end(&self) -> SectionEnd {
+        match self {
+            Self::Direct { section_end, .. } => *section_end,
+            Self::Switch { to, .. } => to.destination_section_end(),
+            Self::SwitchBack { to, .. } => to.destination_section_end(),
+        }
+    }
 }
 
 impl SectionTransition {

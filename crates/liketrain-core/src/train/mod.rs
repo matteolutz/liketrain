@@ -1,7 +1,34 @@
 mod mode;
 pub use mode::*;
 
-use crate::SectionId;
+use crate::{SectionId, Track};
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TrainId(usize);
+
+impl TrainId {
+    pub fn new(id: usize) -> Self {
+        TrainId(id)
+    }
+}
+
+impl std::fmt::Display for TrainId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<usize> for TrainId {
+    fn from(id: usize) -> Self {
+        Self(id)
+    }
+}
+
+impl From<u32> for TrainId {
+    fn from(id: u32) -> Self {
+        Self(id as usize)
+    }
+}
 
 #[derive(Debug)]
 pub struct Train {
@@ -11,6 +38,12 @@ pub struct Train {
 }
 
 impl Train {
+    pub fn validate_route(&self, track: &Track) -> bool {
+        match &self.mode {
+            TrainDrivingMode::Route { route, .. } => route.validate(track),
+        }
+    }
+
     pub fn get_next_section(&self) -> Option<SectionId> {
         self.mode.get_next_section()
     }

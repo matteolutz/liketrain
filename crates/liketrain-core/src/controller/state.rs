@@ -1,8 +1,8 @@
-use crate::SectionId;
+use crate::{SectionId, TrainId};
 
 #[derive(Default)]
 pub struct SectionState {
-    pub(super) occupied: bool,
+    pub(super) occupied: Option<TrainId>,
 }
 
 #[derive(Default)]

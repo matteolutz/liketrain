@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    SectionId, SwitchId, SwitchState, Track, Train,
+    SectionId, SwitchId, SwitchState, Track, Train, TrainId,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
 };
 
@@ -25,7 +25,7 @@ pub use event::*;
 
 pub struct ControllerConfig {
     pub track: Track,
-    pub trains: Vec<Train>,
+    pub trains: HashMap<TrainId, Train>,
 }
 
 #[derive(Copy, Clone)]
@@ -43,7 +43,7 @@ impl<'a> EventExecutionContext<'a> {
 
 pub struct Controller {
     track: Track,
-    trains: Vec<Train>,
+    trains: HashMap<TrainId, Train>,
 
     section_states: HashMap<SectionId, SectionState>,
     switch_states: HashMap<SwitchId, SwitchState>,
@@ -70,43 +70,62 @@ impl Controller {
 }
 
 impl Controller {
-    fn set_section_occupied(
-        &mut self,
-        section_id: SectionId,
-        occupied: bool,
-        ctx: EventExecutionContext,
-    ) {
-        let state = self.section_states.entry(section_id).or_default();
-        state.occupied = occupied;
-
-        if occupied {
-            self.handle_section_occupied(section_id, ctx);
-        }
-    }
-
     fn set_switch_state(&mut self, switch_id: SwitchId, state: impl Into<SwitchState>) {
         self.switch_states.insert(switch_id, state.into());
     }
 
-    fn handle_section_occupied(&mut self, section_id: SectionId, ctx: EventExecutionContext) {
-        let mut inbound_trains = self
-            .trains
-            .iter_mut()
-            .filter(|train| {
-                train
-                    .get_next_section()
-                    .is_some_and(|next_section| next_section == section_id)
-            })
-            .collect::<Vec<_>>();
+    fn set_section_occupied(
+        &mut self,
+        section_id: SectionId,
+        occupied: bool,
+        _ctx: EventExecutionContext,
+    ) {
+        let state = self.section_states.entry(section_id).or_default();
+        let previous_occupied = state.occupied.take();
 
-        if inbound_trains.len() == 1 {
-            // it's just one train, so this must be the train that just entered this section
-            inbound_trains[0].entered_section(section_id);
-            // TODO: probably schedule a TrainEnteredSection event of some sort, which then triggers the switches etc.
-            return;
+        if occupied {
+            if previous_occupied.is_some() {
+                // well, this shouldn't happen
+                // TODO: how to handle this??
+            }
+
+            let mut inbound_trains = self
+                .trains
+                .iter_mut()
+                .filter(|(_, train)| {
+                    train
+                        .get_next_section()
+                        .is_some_and(|next_section| next_section == section_id)
+                })
+                .collect::<Vec<_>>();
+
+            if inbound_trains.len() == 1 {
+                let (id, train) = &mut inbound_trains[0];
+
+                // it's just one train, so this must be the train that just entered this section
+                train.entered_section(section_id);
+                self.scheduler
+                    .schedule_now(ScheduledEvent::TrainEnteredSection {
+                        train_id: **id,
+                        section_id,
+                    });
+
+                state.occupied = Some(**id);
+
+                return;
+            }
+
+            // TODO: probably prevent collision
+        } else {
+            // if this section was occupied, send TrainLeftSection
+            if let Some(previous_occupied) = previous_occupied {
+                self.scheduler
+                    .schedule_now(ScheduledEvent::TrainLeftSection {
+                        train_id: previous_occupied,
+                        section_id,
+                    });
+            }
         }
-
-        // TODO: prevent collision
     }
 }
 
@@ -127,16 +146,36 @@ impl Controller {
             },
             HardwareEvent::SwitchStateChanged { switch_id, state } => {
                 let switch_id_str = str::from_utf8(&switch_id).unwrap();
-                let switch_id = self
-                    .track
-                    .find_switch_id(|switch_id| switch_id.matches(switch_id_str));
+                let switch_id: SwitchId = switch_id_str.into();
 
-                if let Some(switch_id) = switch_id {
-                    self.set_switch_state(switch_id, state);
-                }
+                self.set_switch_state(switch_id, state);
             }
             HardwareEvent::Pong(pong_id) => println!("received pong {}", pong_id),
         }
+        Ok(())
+    }
+
+    fn handle_scheduled_event(
+        &mut self,
+        event: ScheduledEvent,
+        _ctx: EventExecutionContext,
+    ) -> Result<(), ControllerError> {
+        match event {
+            ScheduledEvent::TrainEnteredSection {
+                train_id: _,
+                section_id: _,
+            } => {
+                // TODO: if this trains transition into it's next section goes through switches, set them
+                // and if the next section is occupied, stop the train
+            }
+            ScheduledEvent::TrainLeftSection {
+                train_id: _,
+                section_id: _,
+            } => {
+                // TODO: for now, i don't think, we need to do anything here
+            }
+        }
+
         Ok(())
     }
 
@@ -148,6 +187,9 @@ impl Controller {
         let event = event.into();
 
         match event {
+            ControllerEvent::Scheduled(scheduled_event) => {
+                self.handle_scheduled_event(scheduled_event, ctx)?
+            }
             ControllerEvent::Hardware(hardware_event) => {
                 self.handle_hardware_event(hardware_event, ctx)?
             }
@@ -156,7 +198,7 @@ impl Controller {
         Ok(())
     }
 
-    fn handle_scheduled_events(
+    fn resolve_pending_events(
         &mut self,
         ctx: EventExecutionContext,
     ) -> Result<(), ControllerError> {
@@ -191,14 +233,12 @@ impl Controller {
                         }
                     }
                     default(event_timeout)  => {
-                        self.handle_scheduled_events(ctx)?;
+                        self.resolve_pending_events(ctx)?;
                     }
                 }
-            } else {
-                if let Ok(event) = event_rx.recv() {
-                    self.handle_event(event, ctx)?;
-                }
-            };
+            } else if let Ok(event) = event_rx.recv() {
+                self.handle_event(event, ctx)?;
+            }
         }
     }
 }

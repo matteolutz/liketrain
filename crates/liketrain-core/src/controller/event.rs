@@ -1,6 +1,17 @@
 use liketrain_hardware::event::HardwareEvent;
 
-pub enum ScheduledEvent {}
+use crate::{SectionId, TrainId};
+
+pub enum ScheduledEvent {
+    TrainEnteredSection {
+        train_id: TrainId,
+        section_id: SectionId,
+    },
+    TrainLeftSection {
+        train_id: TrainId,
+        section_id: SectionId,
+    },
+}
 
 pub enum ControllerEvent {
     Scheduled(ScheduledEvent),
