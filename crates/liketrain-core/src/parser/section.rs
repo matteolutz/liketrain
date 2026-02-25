@@ -1,9 +1,9 @@
-use crate::SwitchState;
+use crate::{SectionId, SwitchState};
 
 #[derive(Debug, Clone)]
 pub enum ConnectionExpr<'src> {
     /// Direct connection between two sections
-    Direct { to: &'src str },
+    Direct { to: SectionId },
 
     /// The section goes into a switch
     Switch { switch_name: &'src str },
@@ -20,7 +20,7 @@ pub enum ConnectionExpr<'src> {
 
 #[derive(Debug)]
 pub struct SectionDef<'src> {
-    pub section_name: &'src str,
+    pub section_id: SectionId,
     pub forward: ConnectionExpr<'src>,
     pub backward: ConnectionExpr<'src>,
 }

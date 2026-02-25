@@ -5,7 +5,7 @@ pub use section::*;
 
 pub mod eval;
 
-use crate::SwitchState;
+use crate::{SectionId, SwitchState};
 
 #[cfg(test)]
 mod tests;
@@ -21,6 +21,10 @@ pub fn parser<'src>()
 
     let ident = text::ident().padded();
 
+    let section_id = just("S")
+        .ignore_then(text::int(10).from_str().unwrapped().map(SectionId::new))
+        .padded();
+
     let switch_state = choice((
         just("left").to(SwitchState::Left),
         just("right").to(SwitchState::Right),
@@ -30,7 +34,7 @@ pub fn parser<'src>()
     // direct(S2)
     let direct = just("direct")
         .padded()
-        .ignore_then(ident.delimited_by(just('('), just(')')))
+        .ignore_then(section_id.delimited_by(just('('), just(')')))
         .map(|to| ConnectionExpr::Direct { to });
 
     // switch(A)
@@ -68,15 +72,15 @@ pub fn parser<'src>()
 
     let connection_expr = none.or(direct).or(switch).or(back);
 
-    let section_def = ident
+    let section_def = section_id
         .then_ignore(just(':').padded())
         .then_ignore(just("->").padded())
         .then(connection_expr.clone())
         .then_ignore(just('|').padded())
         .then_ignore(just("<-").padded())
         .then(connection_expr)
-        .map(|((section_name, forward), backward)| SectionDef {
-            section_name,
+        .map(|((section_id, forward), backward)| SectionDef {
+            section_id,
             forward,
             backward,
         });

@@ -38,16 +38,17 @@ impl Track {
             .find_map(|(id, section)| (section.name == section_name).then_some(*id))
     }
 
-    pub fn insert_section(&mut self, section: Section) -> SectionId {
-        let id = self
-            .sections
-            .keys()
-            .max()
-            .map(|id| id.next())
-            .unwrap_or_default();
+    pub fn insert_section(
+        &mut self,
+        section_id: SectionId,
+        section: Section,
+    ) -> Result<(), TrackError> {
+        if self.sections.contains_key(&section_id) {
+            return Err(TrackError::SectionAlreadyExists(section_id));
+        }
 
-        self.sections.insert(id, section);
-        id
+        self.sections.insert(section_id, section);
+        Ok(())
     }
 
     pub fn switch(&self, switch_id: &SwitchId) -> Option<&Switch> {
@@ -62,40 +63,43 @@ impl Track {
         self.switch(switch_id).map(|switch| switch.section_id(self))
     }
 
-    pub fn insert_switch(&mut self, switch: Switch) -> SwitchId {
-        let id = self
-            .switches
-            .keys()
-            .max()
-            .map(|id| id.next())
-            .unwrap_or_default();
+    pub fn insert_switch(
+        &mut self,
+        switch_id: impl Into<SwitchId>,
+        switch: Switch,
+    ) -> Result<(), TrackError> {
+        let switch_id = switch_id.into();
 
-        self.switches.insert(id, switch);
-        id
+        if self.switches.contains_key(&switch_id) {
+            return Err(TrackError::SwitchAlreadyExists(switch_id));
+        }
+
+        self.switches.insert(switch_id, switch);
+        Ok(())
     }
 }
 
 impl Track {
     fn make_switch_transition(
         &self,
-        switch_connection: SwitchConnection,
+        switch_connection: &SwitchConnection,
     ) -> Vec<SectionTransition> {
         match switch_connection {
             SwitchConnection::Section {
                 section_id,
                 section_end,
             } => {
-                vec![SectionTransition::direct(section_id, section_end)]
+                vec![SectionTransition::direct(*section_id, *section_end)]
             }
 
             SwitchConnection::SwitchBack { switch_id, state } => {
-                let Some(switch) = self.switches.get(&switch_id) else {
+                let Some(switch) = self.switches.get(switch_id) else {
                     return vec![];
                 };
 
                 self.make_switch_transition(switch.from())
                     .into_iter()
-                    .map(|trans| SectionTransition::switch_back(switch_id, state, trans))
+                    .map(|trans| SectionTransition::switch_back(switch_id.clone(), *state, trans))
                     .collect()
             }
         }
@@ -140,16 +144,20 @@ impl Track {
                 let switch = self
                     .switches
                     .get(switch_id)
-                    .ok_or(TrackError::SwitchNotFound(*switch_id))?;
+                    .ok_or(TrackError::SwitchNotFound(switch_id.clone()))?;
 
                 let left_transitions = self
                     .make_switch_transition(switch.to(SwitchState::Left))
                     .into_iter()
-                    .map(|trans| SectionTransition::switch(*switch_id, SwitchState::Left, trans));
+                    .map(|trans| {
+                        SectionTransition::switch(switch_id.clone(), SwitchState::Left, trans)
+                    });
                 let right_transitions = self
                     .make_switch_transition(switch.to(SwitchState::Right))
                     .into_iter()
-                    .map(|trans| SectionTransition::switch(*switch_id, SwitchState::Right, trans));
+                    .map(|trans| {
+                        SectionTransition::switch(switch_id.clone(), SwitchState::Right, trans)
+                    });
 
                 left_transitions.chain(right_transitions).collect()
             }
@@ -161,11 +169,13 @@ impl Track {
                 let switch = self
                     .switches
                     .get(switch_id)
-                    .ok_or(TrackError::SwitchNotFound(*switch_id))?;
+                    .ok_or(TrackError::SwitchNotFound(switch_id.clone()))?;
 
-                self.make_switch_transition(switch.from)
+                self.make_switch_transition(switch.from())
                     .into_iter()
-                    .map(|trans| SectionTransition::switch_back(*switch_id, *required_state, trans))
+                    .map(|trans| {
+                        SectionTransition::switch_back(switch_id.clone(), *required_state, trans)
+                    })
                     .collect()
             }
 

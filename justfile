@@ -14,8 +14,8 @@ new package type="bin":
 
 [group("development")]
 [arg("profile", pattern="release|debug")]
-build profile="debug":
-    cargo build {{ if profile == "release" { "--release" } else { "" } }}
+build package="" profile="debug":
+    cargo build {{ if profile == "release" { "--release" } else { "" } }} {{ if package == "" { "" } else { f'-p {{project_name}}-{{package}}' } }}
 
 [group("development")]
 [arg("profile", pattern="release|debug")]

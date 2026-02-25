@@ -11,3 +11,5 @@ mod train;
 pub use train::*;
 
 pub mod parser;
+
+pub mod serial;

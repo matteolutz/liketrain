@@ -34,6 +34,10 @@ pub struct SectionId(usize);
 impl SectionId {
     pub const INVALID: Self = Self(usize::MAX);
 
+    pub fn new(id: usize) -> Self {
+        SectionId(id)
+    }
+
     pub fn next(&self) -> Self {
         SectionId(self.0 + 1)
     }

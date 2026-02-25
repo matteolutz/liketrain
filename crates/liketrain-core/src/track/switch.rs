@@ -1,17 +1,13 @@
+use std::sync::Arc;
+
 use crate::{SectionEnd, SectionId, Track};
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SwitchId(usize);
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SwitchId(Arc<String>);
 
-impl SwitchId {
-    pub fn next(&self) -> Self {
-        Self(self.0 + 1)
-    }
-}
-
-impl From<usize> for SwitchId {
-    fn from(value: usize) -> Self {
-        Self(value)
+impl<T: AsRef<str>> From<T> for SwitchId {
+    fn from(value: T) -> Self {
+        Self(Arc::new(value.as_ref().to_string()))
     }
 }
 
@@ -36,7 +32,7 @@ impl std::fmt::Display for SwitchState {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SwitchConnection {
     Section {
         section_id: SectionId,
@@ -65,6 +61,10 @@ impl SwitchConnection {
         section_id: SectionId::INVALID,
         section_end: SectionEnd::Start,
     };
+
+    pub fn is_invalid(&self) -> bool {
+        self == &Self::INVALID
+    }
 }
 
 #[derive(Debug)]
@@ -87,8 +87,8 @@ impl Switch {
         }
     }
 
-    pub fn from(&self) -> SwitchConnection {
-        self.from
+    pub fn from(&self) -> &SwitchConnection {
+        &self.from
     }
 
     pub fn set_from(&mut self, from: impl Into<SwitchConnection>) {
@@ -102,10 +102,10 @@ impl Switch {
         }
     }
 
-    pub fn to(&self, state: SwitchState) -> SwitchConnection {
+    pub fn to(&self, state: SwitchState) -> &SwitchConnection {
         match state {
-            SwitchState::Left => self.to_left,
-            SwitchState::Right => self.to_right,
+            SwitchState::Left => &self.to_left,
+            SwitchState::Right => &self.to_right,
         }
     }
 
