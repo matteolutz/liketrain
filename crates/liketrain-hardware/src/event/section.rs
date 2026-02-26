@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HardwareSectionPower {
     Off = 0,
     Quarter = 1,

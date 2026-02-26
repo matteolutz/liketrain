@@ -8,27 +8,31 @@ use liketrain_hardware::{
 };
 
 pub trait UsartExt {
+    type Error;
+
     /// Write a struct over the USART.
-    fn write_struct<T>(&mut self, struct_data: &T);
+    fn write_struct<T>(&mut self, struct_data: &T) -> Result<(), Self::Error>;
 
     /// Read a struct from the USART. This will block until the start byte is received.
-    fn read_struct<T>(&mut self) -> Result<T, ()>;
+    fn read_struct<T>(&mut self) -> Result<T, Self::Error>;
 
     /// Try to read a struct from the USART. This will not block, but fail if the start byte is not received.
-    fn try_read_struct<T>(&mut self) -> Result<T, ()>;
+    fn try_read_struct<T>(&mut self) -> Result<T, Self::Error>;
 
     /// Write an event over the USART.
-    fn write_event(&mut self, event: HardwareEvent);
+    fn write_event(&mut self, event: HardwareEvent) -> Result<(), Self::Error>;
 
     /// Read a command from the USART. This will block until the start byte is received.
-    fn read_command(&mut self) -> Result<HardwareCommand, ()>;
+    fn read_command(&mut self) -> Result<HardwareCommand, Self::Error>;
 
     /// Try to read a command from the USART. This will not block, but fail if the start byte is not received.
-    fn try_read_command(&mut self) -> Result<HardwareCommand, ()>;
+    fn try_read_command(&mut self) -> Result<HardwareCommand, Self::Error>;
 }
 
 impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> {
-    fn write_struct<T>(&mut self, struct_data: &T) {
+    type Error = ();
+
+    fn write_struct<T>(&mut self, struct_data: &T) -> Result<(), Self::Error> {
         let size = core::mem::size_of::<T>();
 
         let bytes = unsafe {
@@ -53,9 +57,11 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
         self.write_byte(checksum);
 
         self.flush();
+
+        Ok(())
     }
 
-    fn read_struct<T>(&mut self) -> Result<T, ()> {
+    fn read_struct<T>(&mut self) -> Result<T, Self::Error> {
         while self.read_byte() != SERIAL_START_BYTE {
             // wait for start byte
         }
@@ -89,7 +95,7 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
         Ok(value)
     }
 
-    fn try_read_struct<T>(&mut self) -> Result<T, ()> {
+    fn try_read_struct<T>(&mut self) -> Result<T, Self::Error> {
         if self.read_byte() != SERIAL_START_BYTE {
             return Err(());
         }
@@ -123,17 +129,18 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
         Ok(value)
     }
 
-    fn write_event(&mut self, event: HardwareEvent) {
+    fn write_event(&mut self, event: HardwareEvent) -> Result<(), Self::Error> {
         let event: HardwareEventStruct = event.into();
-        self.write_struct(&event);
+        self.write_struct(&event)?;
+        Ok(())
     }
 
-    fn read_command(&mut self) -> Result<HardwareCommand, ()> {
+    fn read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
         let command_struct: HardwareCommandStruct = self.read_struct()?;
         Ok(command_struct.into())
     }
 
-    fn try_read_command(&mut self) -> Result<HardwareCommand, ()> {
+    fn try_read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
         let command_struct: HardwareCommandStruct = self.try_read_struct()?;
         Ok(command_struct.into())
     }
