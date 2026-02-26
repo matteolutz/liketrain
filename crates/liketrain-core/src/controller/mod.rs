@@ -51,6 +51,7 @@ pub struct Controller {
     scheduler: Scheduler,
 
     section_queues: HashMap<SectionId, VecDeque<TrainId>>,
+    section_reservations: HashMap<SectionId, TrainId>,
 
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
 }
@@ -67,6 +68,7 @@ impl Controller {
             switch_states: HashMap::new(),
             scheduler: Scheduler::default(),
             section_queues: HashMap::new(),
+            section_reservations: HashMap::new(),
             hardware_comm: Box::new(hardware_comm),
         }
     }
@@ -87,6 +89,45 @@ impl Controller {
 impl Controller {
     fn set_switch_state(&mut self, switch_id: SwitchId, state: impl Into<SwitchState>) {
         self.switch_states.insert(switch_id, state.into());
+    }
+
+    fn try_reserve_section(&mut self, section_id: SectionId, train_id: TrainId) -> bool {
+        if let Some(&existing_reservation) = self.section_reservations.get(&section_id) {
+            if existing_reservation != train_id {
+                return false;
+            }
+
+            // already reserved by the same train
+            return true;
+        }
+
+        let section_state = self.section_states.entry(section_id).or_default();
+        if let Some(occupant) = section_state.occupied {
+            // can't reserve a section that is already occupied by another train
+            if occupant != train_id {
+                return false;
+            }
+        }
+
+        self.section_reservations.insert(section_id, train_id);
+        true
+    }
+
+    fn release_reservation(&mut self, section_id: SectionId, train_id: TrainId) {
+        if self.section_reservations.get(&section_id) == Some(&train_id) {
+            self.section_reservations.remove(&section_id);
+        }
+    }
+
+    fn is_section_reserved_by_other(&self, section_id: SectionId, train_id: TrainId) -> bool {
+        self.section_reservations
+            .get(&section_id)
+            .is_some_and(|&holder| holder != train_id)
+    }
+
+    fn is_section_available(&self, section_id: SectionId, for_train: TrainId) -> bool {
+        !self.is_section_occupied(section_id)
+            && !self.is_section_reserved_by_other(section_id, for_train)
     }
 
     fn is_section_occupied(&self, section_id: SectionId) -> bool {
@@ -195,21 +236,32 @@ impl Controller {
             } => {
                 let train = self.train(train_id)?;
 
-                if let Some(transition) = train.get_transition_to_next_section() {
+                if let Some(transition) = train.get_transition_to_next_section().cloned() {
                     let next_section = transition.destination();
 
-                    // TODO: don't just check, if the section is occupied, but also if there are other trains inbound
+                    // don't just check, if the section is occupied, but also if there are other trains inbound
                     // for the next section. if there are other trains inbound, we need to resolve the conflict.
                     // Probably have some sort of waiting queue for each section, and if there are other trains inbound
                     // just append this train to the queue.
 
-                    let any_other_train_inbound =
-                        self.trains.iter().any(|(other_id, other_train)| {
-                            *other_id != train_id
-                                && other_train.get_next_section() == Some(next_section)
-                        });
+                    if self.is_section_available(next_section, train_id) {
+                        self.try_reserve_section(next_section, train_id);
 
-                    if self.is_section_occupied(next_section) || any_other_train_inbound {
+                        // set required switches to the next section first
+                        for (switch_id, state) in transition.required_switch_changes() {
+                            let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
+                            ctx.exec(HardwareCommand::SetSwitchState {
+                                switch_id: hw_switch_id,
+                                state: state.into(),
+                            })?;
+                        }
+
+                        // then set power to next section
+                        ctx.exec(HardwareCommand::SetSectionPower {
+                            section_id: next_section.as_u32(),
+                            power: HardwareSectionPower::Full,
+                        })?;
+                    } else {
                         // stop the train
                         ctx.exec(HardwareCommand::SetSectionPower {
                             section_id: current_section_id.as_u32(),
@@ -221,28 +273,15 @@ impl Controller {
                             .entry(next_section)
                             .or_default()
                             .push_back(train_id);
-                    } else {
-                        // set required switches to the next section
-                        for (switch_id, state) in transition.required_switch_changes() {
-                            let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
-                            ctx.exec(HardwareCommand::SetSwitchState {
-                                switch_id: hw_switch_id,
-                                state: state.into(),
-                            })?;
-                        }
-
-                        // set power of next section
-                        ctx.exec(HardwareCommand::SetSectionPower {
-                            section_id: next_section.as_u32(),
-                            power: HardwareSectionPower::Full,
-                        })?;
                     }
                 }
             }
             ScheduledEvent::TrainLeftSection {
-                train_id: _,
+                train_id,
                 section_id,
             } => {
+                self.release_reservation(section_id, train_id);
+
                 if let Some(waiting_train_id) = self
                     .section_queues
                     .get_mut(&section_id)
@@ -261,11 +300,14 @@ impl Controller {
                         return Ok(());
                     }
 
-                    let transition = train.get_transition_to_next_section().unwrap(); // safe to unwrap
+                    let current_section = train.get_current_section().unwrap();
+                    let transition = train.get_transition_to_next_section().cloned().unwrap(); // safe to unwrap
+
+                    self.try_reserve_section(section_id, train_id);
 
                     // restart the train (repower its current section)
                     ctx.exec(HardwareCommand::SetSectionPower {
-                        section_id: train.get_current_section().unwrap().as_u32(),
+                        section_id: current_section.as_u32(),
                         power: HardwareSectionPower::Full,
                     })?;
 
