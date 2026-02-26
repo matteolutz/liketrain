@@ -5,7 +5,7 @@ pub enum Connection {
     Direct {
         to: SectionId,
 
-        /// The end of the current section that this connected to `to`.
+        /// The end of the current section that is connected to `to`.
         section_end: SectionEnd,
     },
 

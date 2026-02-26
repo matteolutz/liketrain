@@ -136,9 +136,12 @@ impl Track {
 
         let next_sections = match connection {
             Connection::Direct {
-                to,
-                section_end: end,
-            } => vec![SectionTransition::direct(*to, *end)],
+                to: _,
+                section_end: _,
+            } => {
+                todo!("section_end is the wrong thing here");
+                // vec![SectionTransition::direct(*to, *end)]
+            }
 
             Connection::Switch { switch_id } => {
                 let switch = self

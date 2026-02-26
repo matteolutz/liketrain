@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
     SectionId, SwitchId, SwitchState, Track, Train, TrainId,
@@ -50,7 +50,7 @@ pub struct Controller {
 
     scheduler: Scheduler,
 
-    section_queues: HashMap<SectionId, Vec<TrainId>>,
+    section_queues: HashMap<SectionId, VecDeque<TrainId>>,
 
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
 }
@@ -220,14 +220,8 @@ impl Controller {
                         self.section_queues
                             .entry(next_section)
                             .or_default()
-                            .push(train_id);
+                            .push_back(train_id);
                     } else {
-                        // set power of next section
-                        ctx.exec(HardwareCommand::SetSectionPower {
-                            section_id: next_section.as_u32(),
-                            power: HardwareSectionPower::Full,
-                        })?;
-
                         // set required switches to the next section
                         for (switch_id, state) in transition.required_switch_changes() {
                             let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
@@ -236,6 +230,12 @@ impl Controller {
                                 state: state.into(),
                             })?;
                         }
+
+                        // set power of next section
+                        ctx.exec(HardwareCommand::SetSectionPower {
+                            section_id: next_section.as_u32(),
+                            power: HardwareSectionPower::Full,
+                        })?;
                     }
                 }
             }
@@ -246,7 +246,7 @@ impl Controller {
                 if let Some(waiting_train_id) = self
                     .section_queues
                     .get_mut(&section_id)
-                    .and_then(|queue| queue.pop())
+                    .and_then(|queue| queue.pop_front())
                 {
                     // this train was on the queue for this section id
                     // this means, either the section was occupied before
@@ -269,12 +269,6 @@ impl Controller {
                         power: HardwareSectionPower::Full,
                     })?;
 
-                    // power the next section
-                    ctx.exec(HardwareCommand::SetSectionPower {
-                        section_id: section_id.as_u32(),
-                        power: HardwareSectionPower::Full,
-                    })?;
-
                     // set required switches to the next section
                     for (switch_id, state) in transition.required_switch_changes() {
                         let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
@@ -283,6 +277,12 @@ impl Controller {
                             state: state.into(),
                         })?;
                     }
+
+                    // power the next section
+                    ctx.exec(HardwareCommand::SetSectionPower {
+                        section_id: section_id.as_u32(),
+                        power: HardwareSectionPower::Full,
+                    })?;
                 } else {
                     // there are now waiting trains, unpower this section
                     ctx.exec(HardwareCommand::SetSectionPower {
@@ -311,6 +311,9 @@ impl Controller {
                 self.handle_hardware_event(hardware_event, ctx)?
             }
         }
+
+        // TODO: maybe this recursion will become bad
+        self.resolve_pending_events(ctx)?;
 
         Ok(())
     }
