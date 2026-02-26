@@ -16,11 +16,12 @@ fn test_serial_list() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_serial_mega() {
     let port = "COM3";
-    let pong_id = 69;
+
+    let slave_id = 0;
+    let seq = 69;
 
     let mut port = serialport::new(port, 115200)
         .timeout(Duration::from_secs(10))
@@ -28,7 +29,8 @@ fn test_serial_mega() {
         .unwrap();
 
     println!("sending command");
-    port.write_command(HardwareCommand::Ping(pong_id)).unwrap();
+    port.write_command(HardwareCommand::Ping { slave_id, seq })
+        .unwrap();
 
     println!(
         "hardware event struct size: {}",
@@ -38,7 +40,13 @@ fn test_serial_mega() {
     println!("Got response: {:?}", response);
 
     match response {
-        HardwareEvent::Pong(res_pong_id) => assert_eq!(res_pong_id, pong_id),
+        HardwareEvent::Pong {
+            slave_id: res_slave_id,
+            seq: res_seq,
+        } => {
+            assert_eq!(slave_id, res_slave_id);
+            assert_eq!(seq, res_seq);
+        }
         _ => assert!(false),
     }
 }

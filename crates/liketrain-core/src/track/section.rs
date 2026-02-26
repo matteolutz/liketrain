@@ -41,6 +41,10 @@ impl SectionId {
     pub fn next(&self) -> Self {
         SectionId(self.0 + 1)
     }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0 as u32
+    }
 }
 
 impl std::fmt::Display for SectionId {

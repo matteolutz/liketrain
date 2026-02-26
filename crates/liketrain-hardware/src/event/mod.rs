@@ -14,7 +14,10 @@ pub enum HardwareSwitchState {
 
 #[derive(Debug, Copy, Clone)]
 pub enum HardwareEvent {
-    Pong(u32),
+    Pong {
+        slave_id: u32,
+        seq: u32,
+    },
     SectionEvent(SectionEvent),
 
     SwitchStateChanged {

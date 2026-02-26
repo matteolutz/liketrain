@@ -8,7 +8,7 @@ use crate::{
 mod state;
 use liketrain_hardware::{
     command::HardwareCommand,
-    event::{HardwareEvent, SectionEventType},
+    event::{HardwareEvent, HardwareSectionPower, HardwareSwitchId, SectionEventType},
 };
 pub use state::*;
 
@@ -50,6 +50,8 @@ pub struct Controller {
 
     scheduler: Scheduler,
 
+    section_queues: HashMap<SectionId, Vec<TrainId>>,
+
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
 }
 
@@ -64,14 +66,33 @@ impl Controller {
             section_states: HashMap::new(),
             switch_states: HashMap::new(),
             scheduler: Scheduler::default(),
+            section_queues: HashMap::new(),
             hardware_comm: Box::new(hardware_comm),
         }
+    }
+
+    pub fn train(&self, train_id: TrainId) -> Result<&Train, ControllerError> {
+        self.trains
+            .get(&train_id)
+            .ok_or(ControllerError::TrainNotFound(train_id))
+    }
+
+    pub fn train_mut(&mut self, train_id: TrainId) -> Result<&mut Train, ControllerError> {
+        self.trains
+            .get_mut(&train_id)
+            .ok_or(ControllerError::TrainNotFound(train_id))
     }
 }
 
 impl Controller {
     fn set_switch_state(&mut self, switch_id: SwitchId, state: impl Into<SwitchState>) {
         self.switch_states.insert(switch_id, state.into());
+    }
+
+    fn is_section_occupied(&self, section_id: SectionId) -> bool {
+        self.section_states
+            .get(&section_id)
+            .is_some_and(|state| state.occupied.is_some())
     }
 
     fn set_section_occupied(
@@ -99,23 +120,29 @@ impl Controller {
                 })
                 .collect::<Vec<_>>();
 
-            if inbound_trains.len() == 1 {
-                let (id, train) = &mut inbound_trains[0];
-
-                // it's just one train, so this must be the train that just entered this section
-                train.entered_section(section_id);
-                self.scheduler
-                    .schedule_now(ScheduledEvent::TrainEnteredSection {
-                        train_id: **id,
-                        section_id,
-                    });
-
-                state.occupied = Some(**id);
-
+            if inbound_trains.is_empty() {
+                // there are no inbound trains, which is weird
+                // TODO: probably stop everything? something went wrong
                 return;
             }
 
-            // TODO: probably prevent collision
+            if inbound_trains.len() > 1 {
+                // multiple trains are inbound for the same section??? something went wrong
+                // TODO: probably stop everything? something went wrong
+                return;
+            }
+
+            let (inbound_train_id, inbound_train) = &mut inbound_trains[0];
+
+            // it's just one train, so this must be the train that just entered this section
+            inbound_train.entered_section(section_id);
+            self.scheduler
+                .schedule_now(ScheduledEvent::TrainEnteredSection {
+                    train_id: **inbound_train_id,
+                    section_id,
+                });
+
+            state.occupied = Some(**inbound_train_id);
         } else {
             // if this section was occupied, send TrainLeftSection
             if let Some(previous_occupied) = previous_occupied {
@@ -145,12 +172,13 @@ impl Controller {
                 }
             },
             HardwareEvent::SwitchStateChanged { switch_id, state } => {
-                let switch_id_str = str::from_utf8(&switch_id).unwrap();
-                let switch_id: SwitchId = switch_id_str.into();
+                let switch_id = SwitchId::from_hardware_id(&switch_id);
 
                 self.set_switch_state(switch_id, state);
             }
-            HardwareEvent::Pong(pong_id) => println!("received pong {}", pong_id),
+            HardwareEvent::Pong { slave_id, seq } => {
+                println!("received pong from slave {} with seq {}", slave_id, seq)
+            }
         }
         Ok(())
     }
@@ -158,21 +186,110 @@ impl Controller {
     fn handle_scheduled_event(
         &mut self,
         event: ScheduledEvent,
-        _ctx: EventExecutionContext,
+        ctx: EventExecutionContext,
     ) -> Result<(), ControllerError> {
         match event {
             ScheduledEvent::TrainEnteredSection {
-                train_id: _,
-                section_id: _,
+                train_id,
+                section_id: current_section_id,
             } => {
-                // TODO: if this trains transition into it's next section goes through switches, set them
-                // and if the next section is occupied, stop the train
+                let train = self.train(train_id)?;
+
+                if let Some(transition) = train.get_transition_to_next_section() {
+                    let next_section = transition.destination();
+
+                    // TODO: don't just check, if the section is occupied, but also if there are other trains inbound
+                    // for the next section. if there are other trains inbound, we need to resolve the conflict.
+                    // Probably have some sort of waiting queue for each section, and if there are other trains inbound
+                    // just append this train to the queue.
+
+                    let any_other_train_inbound =
+                        self.trains.iter().any(|(other_id, other_train)| {
+                            *other_id != train_id
+                                && other_train.get_next_section() == Some(next_section)
+                        });
+
+                    if self.is_section_occupied(next_section) || any_other_train_inbound {
+                        // stop the train
+                        ctx.exec(HardwareCommand::SetSectionPower {
+                            section_id: current_section_id.as_u32(),
+                            power: HardwareSectionPower::Off,
+                        })?;
+
+                        // append it to the waiting trains
+                        self.section_queues
+                            .entry(next_section)
+                            .or_default()
+                            .push(train_id);
+                    } else {
+                        // set power of next section
+                        ctx.exec(HardwareCommand::SetSectionPower {
+                            section_id: next_section.as_u32(),
+                            power: HardwareSectionPower::Full,
+                        })?;
+
+                        // set required switches to the next section
+                        for (switch_id, state) in transition.required_switch_changes() {
+                            let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
+                            ctx.exec(HardwareCommand::SetSwitchState {
+                                switch_id: hw_switch_id,
+                                state: state.into(),
+                            })?;
+                        }
+                    }
+                }
             }
             ScheduledEvent::TrainLeftSection {
                 train_id: _,
-                section_id: _,
+                section_id,
             } => {
-                // TODO: for now, i don't think, we need to do anything here
+                if let Some(waiting_train_id) = self
+                    .section_queues
+                    .get_mut(&section_id)
+                    .and_then(|queue| queue.pop())
+                {
+                    // this train was on the queue for this section id
+                    // this means, either the section was occupied before
+                    // or there was another train inbound
+                    let train = self.trains.get(&waiting_train_id).unwrap();
+
+                    if train
+                        .get_next_section()
+                        .is_none_or(|next_section| next_section != section_id)
+                    {
+                        // this train has changed its mind? it doesn't want to go to this section anymore
+                        return Ok(());
+                    }
+
+                    let transition = train.get_transition_to_next_section().unwrap(); // safe to unwrap
+
+                    // restart the train (repower its current section)
+                    ctx.exec(HardwareCommand::SetSectionPower {
+                        section_id: train.get_current_section().unwrap().as_u32(),
+                        power: HardwareSectionPower::Full,
+                    })?;
+
+                    // power the next section
+                    ctx.exec(HardwareCommand::SetSectionPower {
+                        section_id: section_id.as_u32(),
+                        power: HardwareSectionPower::Full,
+                    })?;
+
+                    // set required switches to the next section
+                    for (switch_id, state) in transition.required_switch_changes() {
+                        let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
+                        ctx.exec(HardwareCommand::SetSwitchState {
+                            switch_id: hw_switch_id,
+                            state: state.into(),
+                        })?;
+                    }
+                } else {
+                    // there are now waiting trains, unpower this section
+                    ctx.exec(HardwareCommand::SetSectionPower {
+                        section_id: section_id.as_u32(),
+                        power: HardwareSectionPower::Off,
+                    })?;
+                }
             }
         }
 

@@ -62,6 +62,34 @@ impl SectionTransition {
             Self::SwitchBack { to, .. } => to.destination_section_end(),
         }
     }
+
+    fn _required_switch_changes(&self, changes: &mut Vec<(SwitchId, SwitchState)>) {
+        match self {
+            Self::Switch {
+                switch_id,
+                state,
+                to,
+            } => {
+                changes.push((switch_id.clone(), *state));
+                to._required_switch_changes(changes);
+            }
+            Self::SwitchBack {
+                switch_id,
+                state,
+                to,
+            } => {
+                changes.push((switch_id.clone(), *state));
+                to._required_switch_changes(changes);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn required_switch_changes(&self) -> Vec<(SwitchId, SwitchState)> {
+        let mut changes = Vec::new();
+        self._required_switch_changes(&mut changes);
+        changes
+    }
 }
 
 impl SectionTransition {

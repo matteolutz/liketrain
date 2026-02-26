@@ -1,7 +1,7 @@
 mod mode;
 pub use mode::*;
 
-use crate::{SectionId, Track};
+use crate::{Direction, SectionEnd, SectionId, SectionTransition};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TrainId(usize);
@@ -38,28 +38,50 @@ pub struct Train {
 }
 
 impl Train {
-    pub fn validate_route(&self, track: &Track) -> bool {
-        match &self.mode {
-            TrainDrivingMode::Route { route, .. } => route.validate(track),
-        }
+    pub fn get_current_section(&self) -> Option<SectionId> {
+        self.mode.get_current_section()
     }
 
     pub fn get_next_section(&self) -> Option<SectionId> {
         self.mode.get_next_section()
     }
 
+    /// Get the transition from the current section to the next section.
+    pub fn get_transition_to_next_section(&self) -> Option<&SectionTransition> {
+        match &self.mode {
+            TrainDrivingMode::Route {
+                route,
+                current_via_idx,
+                ..
+            } => route.transition(*current_via_idx),
+        }
+    }
+
     pub fn entered_section(&mut self, section_id: SectionId) {
-        let expected_next_section = self.get_next_section();
-        if expected_next_section.is_none_or(|expected| expected != section_id) {
+        let Some(transition) = self.get_transition_to_next_section() else {
+            return;
+        };
+
+        let expected_next_section = transition.destination();
+        if expected_next_section != section_id {
             // TODO: handle this?? maybe switch to manual mode
             return;
         }
 
+        let section_end = transition.destination_section_end();
+
         match &mut self.mode {
             TrainDrivingMode::Route {
-                current_via_idx, ..
+                current_via_idx,
+                current_section_direction,
+                ..
             } => {
                 *current_via_idx += 1;
+
+                match section_end {
+                    SectionEnd::End => *current_section_direction = Direction::Backward,
+                    SectionEnd::Start => *current_section_direction = Direction::Forward,
+                }
             }
         }
     }

@@ -16,7 +16,7 @@ pub struct HardwareEventSwitchStateChange {
 
 #[repr(C, packed)]
 pub union HardwareEventUnion {
-    pub pong: u32,
+    pub pong: (u32, u32),
     pub section_event: SectionEvent,
     pub switch_state_change: HardwareEventSwitchStateChange,
 }
@@ -28,10 +28,12 @@ pub struct HardwareEventStruct {
 }
 
 impl HardwareEventStruct {
-    pub fn pong(data: u32) -> Self {
+    pub fn pong(slave_id: u32, seq: u32) -> Self {
         Self {
             tag: HardwareEventType::Pong,
-            data: HardwareEventUnion { pong: data },
+            data: HardwareEventUnion {
+                pong: (slave_id, seq),
+            },
         }
     }
 
@@ -57,7 +59,7 @@ impl HardwareEventStruct {
 impl From<HardwareEvent> for HardwareEventStruct {
     fn from(value: HardwareEvent) -> Self {
         match value {
-            HardwareEvent::Pong(data) => Self::pong(data),
+            HardwareEvent::Pong { slave_id, seq } => Self::pong(slave_id, seq),
             HardwareEvent::SectionEvent(section_event) => Self::section_event(section_event),
             HardwareEvent::SwitchStateChanged { switch_id, state } => {
                 Self::switch_state_change(HardwareEventSwitchStateChange { switch_id, state })
@@ -69,7 +71,12 @@ impl From<HardwareEvent> for HardwareEventStruct {
 impl From<HardwareEventStruct> for HardwareEvent {
     fn from(value: HardwareEventStruct) -> Self {
         match value.tag {
-            HardwareEventType::Pong => unsafe { HardwareEvent::Pong(value.data.pong) },
+            HardwareEventType::Pong => unsafe {
+                HardwareEvent::Pong {
+                    slave_id: value.data.pong.0,
+                    seq: value.data.pong.1,
+                }
+            },
             HardwareEventType::SectionEvent => unsafe {
                 HardwareEvent::SectionEvent(value.data.section_event)
             },

@@ -50,18 +50,21 @@ fn test_route_validation() {
     let eval = Evaluator::default();
     let track = eval.evaluate(track_defs).unwrap();
 
-    let r1 = Route::new([24_usize, 22, 21, 24], Direction::Forward);
-    let r1_is_valid = r1.validate(&track);
+    let Some(r1) = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track) else {
+        assert!(false, "Route 1 failed");
+        return;
+    };
 
-    assert!(r1_is_valid);
-    println!("Route 1 valid: {}", r1_is_valid);
+    println!("Route 1 valid: {}", r1.pretty_print(&track));
 
-    let r2 = Route::new(
+    let Some(r2) = Route::new(
         [24_usize, 22, 8, 3, 9, 10, 11, 13, 25, 23],
         Direction::Forward,
-    );
-    let r2_is_valid = r2.validate(&track);
+        &track,
+    ) else {
+        assert!(false, "Route 2 failed");
+        return;
+    };
 
-    assert!(r2_is_valid);
-    println!("Route 2 valid: {}", r2_is_valid);
+    println!("Route 2 valid: {}", r2.pretty_print(&track));
 }

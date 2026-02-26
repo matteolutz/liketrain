@@ -118,6 +118,13 @@ pub struct Section<A, B, C, D, T> {
     is_occupied: bool,
 }
 
+pub trait SectionDelegate {
+    fn section_id(&self) -> u32;
+    fn is_occupied(&self) -> bool;
+    fn set_power(&mut self, power: HardwareSectionPower) -> Result<(), SectionError>;
+    fn update(&mut self, event_list: &mut Vec<HardwareEvent>) -> Result<(), SectionError>;
+}
+
 impl<A, B, C, D, T> Section<A, B, C, D, T>
 where
     A: OutputPin,
@@ -138,20 +145,29 @@ where
             is_occupied: false,
         }
     }
+}
 
-    pub fn section_id(&self) -> u32 {
+impl<A, B, C, D, T> SectionDelegate for Section<A, B, C, D, T>
+where
+    A: OutputPin,
+    B: OutputPin,
+    C: OutputPin,
+    D: OutputPin,
+    T: InputPin,
+{
+    fn section_id(&self) -> u32 {
         self.section_id
     }
 
-    pub fn is_occupied(&mut self) -> bool {
+    fn is_occupied(&self) -> bool {
         self.is_occupied
     }
 
-    pub fn set_power(&mut self, power: HardwareSectionPower) -> Result<(), SectionError> {
+    fn set_power(&mut self, power: HardwareSectionPower) -> Result<(), SectionError> {
         self.power_relais.set_power(power)
     }
 
-    pub fn update(&mut self, event_list: &mut Vec<HardwareEvent>) -> Result<(), SectionError> {
+    fn update(&mut self, event_list: &mut Vec<HardwareEvent>) -> Result<(), SectionError> {
         let is_occupied = self
             .train_detection
             .is_high()

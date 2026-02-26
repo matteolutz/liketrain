@@ -59,32 +59,4 @@ where
             .try_read_struct()
             .map_err(|_| Rs485Error::SerialError)
     }
-
-    fn write_event(
-        &mut self,
-        event: liketrain_hardware::event::HardwareEvent,
-    ) -> Result<(), Self::Error> {
-        self.transmit()?;
-        self.serial
-            .write_event(event)
-            .map_err(|_| Rs485Error::SerialError)
-    }
-
-    fn read_command(
-        &mut self,
-    ) -> Result<liketrain_hardware::command::HardwareCommand, Self::Error> {
-        self.receive()?;
-        self.serial
-            .read_command()
-            .map_err(|_| Rs485Error::SerialError)
-    }
-
-    fn try_read_command(
-        &mut self,
-    ) -> Result<liketrain_hardware::command::HardwareCommand, Self::Error> {
-        self.receive()?;
-        self.serial
-            .try_read_command()
-            .map_err(|_| Rs485Error::SerialError)
-    }
 }

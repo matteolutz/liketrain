@@ -31,12 +31,14 @@ impl PartialEq for TimedEvent {
 impl Eq for TimedEvent {}
 
 #[derive(Default)]
-pub struct Scheduler(BinaryHeap<TimedEvent>);
+pub struct Scheduler {
+    time_events: BinaryHeap<TimedEvent>,
+}
 
 impl Scheduler {
     pub fn schedule(&mut self, when: time::Instant, event: impl Into<ScheduledEvent>) {
         let event = event.into();
-        self.0.push(TimedEvent { when, event });
+        self.time_events.push(TimedEvent { when, event });
     }
 
     pub fn schedule_now(&mut self, event: impl Into<ScheduledEvent>) {
@@ -44,7 +46,7 @@ impl Scheduler {
     }
 
     pub fn next_event_duration(&self) -> Option<Duration> {
-        self.0.peek().map(|event| {
+        self.time_events.peek().map(|event| {
             let now = time::Instant::now();
             if event.when <= now {
                 Duration::ZERO
@@ -57,15 +59,19 @@ impl Scheduler {
     pub fn next_event(&mut self) -> Option<ScheduledEvent> {
         let now = time::Instant::now();
 
-        if self.0.is_empty() {
+        if self.time_events.is_empty() {
             return None;
         }
 
-        if self.0.peek().is_some_and(|event| event.when > now) {
+        if self
+            .time_events
+            .peek()
+            .is_some_and(|event| event.when > now)
+        {
             return None;
         }
 
-        let event = self.0.pop().unwrap();
+        let event = self.time_events.pop().unwrap();
         Some(event.event)
     }
 }

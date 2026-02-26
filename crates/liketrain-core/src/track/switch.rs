@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use liketrain_hardware::event::HardwareSwitchState;
+use liketrain_hardware::event::{HardwareSwitchId, HardwareSwitchState};
 
 use crate::{SectionEnd, SectionId, Track};
 
@@ -12,11 +12,25 @@ impl SwitchId {
         let other = other.as_ref();
         other == self.0.as_ref()
     }
+
+    pub fn from_hardware_id(id: &HardwareSwitchId) -> Self {
+        let switch_id_str = str::from_utf8(id).unwrap();
+        switch_id_str.into()
+    }
 }
 
 impl<T: AsRef<str>> From<T> for SwitchId {
     fn from(value: T) -> Self {
         Self(Arc::new(value.as_ref().to_string()))
+    }
+}
+
+impl TryFrom<SwitchId> for HardwareSwitchId {
+    type Error = ();
+
+    fn try_from(value: SwitchId) -> Result<Self, Self::Error> {
+        let bytes = value.0.as_bytes();
+        bytes.try_into().map_err(|_| ())
     }
 }
 
@@ -37,6 +51,15 @@ impl From<HardwareSwitchState> for SwitchState {
         match value {
             HardwareSwitchState::Left => Self::Left,
             HardwareSwitchState::Right => Self::Right,
+        }
+    }
+}
+
+impl From<SwitchState> for HardwareSwitchState {
+    fn from(value: SwitchState) -> Self {
+        match value {
+            SwitchState::Left => Self::Left,
+            SwitchState::Right => Self::Right,
         }
     }
 }

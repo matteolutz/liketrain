@@ -1,11 +1,13 @@
 use core::mem::MaybeUninit;
 
-use arduino_hal::{Usart, hal::Atmega, usart::UsartOps};
+use arduino_hal::{Usart, hal::Atmega, prelude::_embedded_hal_serial_Read, usart::UsartOps};
 use liketrain_hardware::{
     SERIAL_START_BYTE,
     command::{HardwareCommand, avr::HardwareCommandStruct},
     event::{HardwareEvent, avr::HardwareEventStruct},
 };
+
+use crate::mode::{SlaveCommand, SlaveResponse};
 
 pub trait UsartExt {
     type Error;
@@ -20,13 +22,115 @@ pub trait UsartExt {
     fn try_read_struct<T>(&mut self) -> Result<T, Self::Error>;
 
     /// Write an event over the USART.
-    fn write_event(&mut self, event: HardwareEvent) -> Result<(), Self::Error>;
+    fn write_event(&mut self, event: HardwareEvent) -> Result<(), Self::Error> {
+        let event: HardwareEventStruct = event.into();
+        self.write_struct(&event)?;
+        Ok(())
+    }
+
+    /// Write multiple events over the USART.
+    fn write_events(
+        &mut self,
+        events: impl IntoIterator<Item = HardwareEvent>,
+    ) -> Result<(), Self::Error> {
+        for event in events {
+            self.write_event(event)?;
+        }
+        Ok(())
+    }
+
+    /// Read an event from the USART. This will block until the start byte is received.
+    fn read_event(&mut self) -> Result<HardwareEvent, Self::Error> {
+        let event_struct: HardwareEventStruct = self.read_struct()?;
+        Ok(event_struct.into())
+    }
+
+    /// Try to read an event from the USART. This will not block, but fail if the start byte is not received.
+    fn try_read_event(&mut self) -> Result<HardwareEvent, Self::Error> {
+        let event_struct: HardwareEventStruct = self.try_read_struct()?;
+        Ok(event_struct.into())
+    }
+
+    /// Write a command to the USART.
+    fn write_command(&mut self, command: HardwareCommand) -> Result<(), Self::Error> {
+        let command_struct: HardwareCommandStruct = command.into();
+        self.write_struct(&command_struct)
+    }
+
+    /// Write multiple commands to the USART.
+    fn write_commands(
+        &mut self,
+        commands: impl IntoIterator<Item = HardwareCommand>,
+    ) -> Result<(), Self::Error> {
+        for command in commands {
+            self.write_command(command)?;
+        }
+        Ok(())
+    }
 
     /// Read a command from the USART. This will block until the start byte is received.
-    fn read_command(&mut self) -> Result<HardwareCommand, Self::Error>;
+    fn read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
+        let command_struct: HardwareCommandStruct = self.read_struct()?;
+        Ok(command_struct.into())
+    }
 
     /// Try to read a command from the USART. This will not block, but fail if the start byte is not received.
-    fn try_read_command(&mut self) -> Result<HardwareCommand, Self::Error>;
+    fn try_read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
+        let command_struct: HardwareCommandStruct = self.try_read_struct()?;
+        Ok(command_struct.into())
+    }
+
+    /// Write a slave command to the USART.
+    fn write_slave_command(&mut self, command: SlaveCommand) -> Result<(), Self::Error> {
+        self.write_struct(&command)
+    }
+
+    /// Write multiple slave commands to the USART.
+    fn write_slave_commands(
+        &mut self,
+        commands: impl IntoIterator<Item = SlaveCommand>,
+    ) -> Result<(), Self::Error> {
+        for command in commands {
+            self.write_slave_command(command)?;
+        }
+        Ok(())
+    }
+
+    /// Read a slave command from the USART. This will block until the start byte is received.
+    fn read_slave_command(&mut self) -> Result<SlaveCommand, Self::Error> {
+        self.read_struct()
+    }
+
+    /// Try to read a slave command from the USART. This will not block.
+    fn try_read_slave_command(&mut self) -> Result<SlaveCommand, Self::Error> {
+        self.try_read_struct()
+    }
+
+    /// Write a slave response to the USART.
+    fn write_slave_response(&mut self, response: SlaveResponse) -> Result<(), Self::Error> {
+        self.write_struct(&response)
+    }
+
+    /// Write multiple slave responses to the USART.
+    fn write_slave_responses(
+        &mut self,
+        responses: impl IntoIterator<Item = SlaveResponse>,
+    ) -> Result<(), Self::Error> {
+        for response in responses {
+            self.write_slave_response(response)?;
+        }
+        Ok(())
+    }
+
+    /// Read a slave response from the USART. This will block until the start byte is received.
+    fn read_slave_response(&mut self) -> Result<SlaveResponse, Self::Error> {
+        self.read_struct()
+    }
+
+    /// Try to read a slave response from the USART. This will not block.
+    fn try_read_slave_response(&mut self) -> Result<SlaveResponse, Self::Error> {
+        self.try_read_struct()
+    }
 }
 
 impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> {
@@ -96,9 +200,15 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
     }
 
     fn try_read_struct<T>(&mut self) -> Result<T, Self::Error> {
-        if self.read_byte() != SERIAL_START_BYTE {
-            return Err(());
-        }
+        match self.read() {
+            Ok(byte) => {
+                if byte != SERIAL_START_BYTE {
+                    return Err(());
+                }
+            }
+            Err(nb::Error::WouldBlock) => return Err(()),
+            Err(_) => return Err(()),
+        };
 
         let size_low = self.read_byte();
         let size_high = self.read_byte();
@@ -127,21 +237,5 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
 
         let value = unsafe { buffer.assume_init() };
         Ok(value)
-    }
-
-    fn write_event(&mut self, event: HardwareEvent) -> Result<(), Self::Error> {
-        let event: HardwareEventStruct = event.into();
-        self.write_struct(&event)?;
-        Ok(())
-    }
-
-    fn read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
-        let command_struct: HardwareCommandStruct = self.read_struct()?;
-        Ok(command_struct.into())
-    }
-
-    fn try_read_command(&mut self) -> Result<HardwareCommand, Self::Error> {
-        let command_struct: HardwareCommandStruct = self.try_read_struct()?;
-        Ok(command_struct.into())
     }
 }

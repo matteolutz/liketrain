@@ -1,12 +1,21 @@
-use crate::event::HardwareSectionPower;
+use crate::event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState};
 
 pub mod avr;
 
 #[derive(Debug)]
 pub enum HardwareCommand {
-    Ping(u32),
+    Ping {
+        slave_id: u32,
+        seq: u32,
+    },
+
     SetSectionPower {
         section_id: u32,
         power: HardwareSectionPower,
+    },
+
+    SetSwitchState {
+        switch_id: HardwareSwitchId,
+        state: HardwareSwitchState,
     },
 }
