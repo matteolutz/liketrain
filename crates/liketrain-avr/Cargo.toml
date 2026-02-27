@@ -27,6 +27,7 @@ features = ["arduino-mega2560"]
 [dependencies.avr-device]
 version = "0.8.1"
 features = ["atmega2560"]
+# features = ["atmega328p"]
 
 [features]
 default = ["sim"]

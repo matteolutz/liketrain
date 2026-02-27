@@ -92,7 +92,10 @@ where
 
             if Self::checksum(payload.iter().copied()) != checksum {
                 // remove invalid payload
-                self.stream_mut().shift();
+                // self.stream_mut().shift();
+
+                // drain the invalid payload
+                self.stream_mut().drain(0..(5 + size + 1));
                 continue;
             }
 

@@ -1,4 +1,3 @@
-use alloc::format;
 use liketrain_hardware::event::{HardwareEvent, SectionEvent};
 
 use crate::command::CommandExecutionContext;
@@ -100,7 +99,7 @@ impl<const N: usize> SimTrain<N> {
             return;
         }
 
-        let last_update = self.last_update.get_or_insert_with(|| millis);
+        let last_update = self.last_update.get_or_insert(millis);
         let diff = millis - *last_update;
         *last_update = millis;
 
@@ -114,7 +113,6 @@ impl<const N: usize> SimTrain<N> {
 
         if let Some(new_route_idx) = new_route_idx {
             let new_section = self.route[new_route_idx].section_id;
-            ctx.debug(format!("proceeding to {}", new_section));
 
             // free the current section
             ctx.event_list

@@ -35,13 +35,12 @@ impl ControllerHardwareCommunication for SerialControllerHardwareCommunication {
             let mut interface: SerialportSerialInterface = port.into();
             let mut serial = Serial::new(&mut interface);
 
-            let ticker = tick(Duration::from_millis(10));
+            let ticker = tick(Duration::from_millis(50));
 
             loop {
                 select! {
                     recv(channels.command_rx) -> command => {
                         if let Ok(command) = command {
-                            log::debug!("sending command: {:?}", command);
                             serial.write(&command).unwrap();
                         }
                     }

@@ -6,7 +6,7 @@ extern crate alloc;
 
 use core::cell::Cell;
 
-use alloc::{format, string::ToString, vec::Vec};
+use alloc::vec::Vec;
 use arduino_hal::Usart;
 use avr_device::interrupt::Mutex;
 use embedded_alloc::LlffHeap;
@@ -149,8 +149,6 @@ fn main() -> ! {
                 let _ = usb_serial.update();
 
                 while let Some(command) = usb_serial.read::<HardwareCommand>().ok().flatten() {
-                    execution_ctx.debug("got command");
-
                     let Ok(was_handled) = command.execute(&mut execution_ctx) else {
                         continue;
                     };
@@ -231,8 +229,6 @@ fn main() -> ! {
         // send events back to master or host
         match MODE {
             LiketrainMode::Master => {
-                if !execution_ctx.event_list.is_empty() {}
-
                 for event in execution_ctx.event_list.drain(..) {
                     let _ = usb_serial.write(&event);
                 }

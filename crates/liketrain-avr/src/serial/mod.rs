@@ -58,12 +58,12 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> SerialInterface for UsartInterface
         &mut self,
         bytes: &mut [u8],
     ) -> Result<usize, liketrain_hardware::serial::SerialError<Self::Error>> {
-        for i in 0..bytes.len() {
+        for (i, byte) in bytes.iter_mut().enumerate() {
             match self.0.read() {
-                Ok(byte) => {
-                    bytes[i] = byte;
+                Ok(recv_byte) => {
+                    *byte = recv_byte;
                 }
-                Err(err) if err == nb::Error::WouldBlock => {
+                Err(nb::Error::WouldBlock) => {
                     return Ok(i);
                 }
                 Err(_) => Err(())?,
