@@ -13,12 +13,14 @@ use embedded_alloc::LlffHeap;
 use liketrain_hardware::command::HardwareCommand;
 use panic_halt as _;
 
+#[cfg(feature = "sim")]
+use crate::sim::SimTrain;
 use crate::{
     command::{CommandExecutionContext, CommandExt},
     mode::{LiketrainMode, SlaveCommand, SlaveId, SlaveResponse},
     rs485::Rs485,
     serial::UsartExt,
-    track::SectionDelegate,
+    track::{Section, SectionDelegate, SectionPowerRelais},
 };
 
 mod command;
@@ -26,6 +28,9 @@ mod mode;
 mod rs485;
 mod serial;
 mod track;
+
+#[cfg(feature = "sim")]
+mod sim;
 
 const MODE: LiketrainMode = LiketrainMode::Master;
 
@@ -68,8 +73,49 @@ fn main() -> ! {
         avr_device::interrupt::enable();
     }
 
+    let mut section_24 = Section::new(
+        24,
+        SectionPowerRelais::new(
+            pins.d4.into_output(),
+            pins.d5.into_output(),
+            pins.d6.into_output(),
+            pins.d7.into_output(),
+        )
+        .unwrap(),
+        pins.d8,
+    );
+
+    let mut section_22 = Section::new(
+        22,
+        SectionPowerRelais::new(
+            pins.d9.into_output(),
+            pins.d10.into_output(),
+            pins.d11.into_output(),
+            pins.d12.into_output(),
+        )
+        .unwrap(),
+        pins.d13,
+    );
+
+    let mut section_21 = Section::new(
+        21,
+        SectionPowerRelais::new(
+            pins.d21.into_output(),
+            pins.d22.into_output(),
+            pins.d23.into_output(),
+            pins.d24.into_output(),
+        )
+        .unwrap(),
+        pins.d25,
+    );
+
     let slave_ids: [SlaveId; 0] = [];
-    let mut sections: [&mut dyn SectionDelegate; 0] = [];
+    let mut sections: [&mut dyn SectionDelegate; 3] =
+        [&mut section_21, &mut section_22, &mut section_24];
+
+    #[cfg(feature = "sim")]
+    let mut sim_train: SimTrain<4> =
+        SimTrain::new([(24, 5000), (22, 5000), (21, 5000), (24, 5000)]);
 
     let mut usb_serial = arduino_hal::default_serial!(dp, pins, 115200);
 
@@ -78,11 +124,13 @@ fn main() -> ! {
 
     let mut event_list = Vec::new();
     let mut slave_commands = Vec::new();
+    let mut debug_messages = Vec::new();
 
     let mut execution_ctx = CommandExecutionContext {
         mode: MODE,
         event_list: &mut event_list,
         sections: &mut sections,
+        debug_messages: &mut debug_messages,
     };
 
     loop {
@@ -129,6 +177,10 @@ fn main() -> ! {
             let _ = rs485.write_slave_commands(slave_commands.drain(..).map(|cmd| cmd.into()));
         }
 
+        // update sim trains
+        #[cfg(feature = "sim")]
+        sim_train.update(&mut execution_ctx, millis());
+
         // update own sections
         for section in execution_ctx.sections.iter_mut() {
             let _ = section.update(execution_ctx.event_list);
@@ -163,6 +215,10 @@ fn main() -> ! {
         match MODE {
             LiketrainMode::Master => {
                 let _ = usb_serial.write_events(execution_ctx.event_list.drain(..));
+
+                for msg in execution_ctx.debug_messages.drain(..) {
+                    let _ = usb_serial.write_debug_message(&msg);
+                }
             }
             LiketrainMode::Slave { .. } => {
                 // do nothing, wait for a master poll, then drain the event list

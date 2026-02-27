@@ -1,0 +1,4 @@
+set shell := ["powershell.exe", "-c"]
+
+run profile="dev":
+    cargo run {{ if profile == "release" { "--release --no-default-features" } else { "" } }}

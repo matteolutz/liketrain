@@ -1,5 +1,5 @@
-use crossbeam::channel::SendError;
-use liketrain_hardware::command::HardwareCommand;
+use crossbeam::channel::{RecvError, SendError};
+use liketrain_hardware::{command::HardwareCommand, event::HardwareEvent};
 use thiserror::Error;
 
 use crate::TrainId;
@@ -11,4 +11,13 @@ pub enum ControllerError {
 
     #[error("Train not found: {0}")]
     TrainNotFound(TrainId),
+
+    #[error("Crossbeam receive error: {0}")]
+    CrossbeamRecvError(#[from] RecvError),
+
+    #[error("Expected hardware event: {0:?}")]
+    ExpectedHardwareEvent(HardwareEvent),
+
+    #[error("Serial communication error: {0}")]
+    Serial(#[from] serialport::Error),
 }

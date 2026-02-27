@@ -1,7 +1,7 @@
 mod mode;
 pub use mode::*;
 
-use crate::{Direction, SectionEnd, SectionId, SectionTransition};
+use crate::{Direction, Route, SectionEnd, SectionId, SectionTransition};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TrainId(usize);
@@ -35,6 +35,15 @@ pub struct Train {
     name: String,
 
     mode: TrainDrivingMode,
+}
+
+impl Train {
+    pub fn from_route(name: String, route: Route) -> Self {
+        Self {
+            name,
+            mode: route.into(),
+        }
+    }
 }
 
 impl Train {

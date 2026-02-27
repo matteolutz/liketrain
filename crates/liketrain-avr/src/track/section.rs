@@ -120,8 +120,16 @@ pub struct Section<A, B, C, D, T> {
 
 pub trait SectionDelegate {
     fn section_id(&self) -> u32;
+
     fn is_occupied(&self) -> bool;
+
+    fn current_power(&self) -> HardwareSectionPower;
     fn set_power(&mut self, power: HardwareSectionPower) -> Result<(), SectionError>;
+
+    fn reset(&mut self) -> Result<(), SectionError> {
+        self.set_power(HardwareSectionPower::Off)
+    }
+
     fn update(&mut self, event_list: &mut Vec<HardwareEvent>) -> Result<(), SectionError>;
 }
 
@@ -161,6 +169,10 @@ where
 
     fn is_occupied(&self) -> bool {
         self.is_occupied
+    }
+
+    fn current_power(&self) -> HardwareSectionPower {
+        self.power_relais.current_power()
     }
 
     fn set_power(&mut self, power: HardwareSectionPower) -> Result<(), SectionError> {

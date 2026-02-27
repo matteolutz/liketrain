@@ -11,20 +11,19 @@ pub trait SerialExt {
     /// Write a struct over the USART.
     fn write_struct<T>(&mut self, struct_data: &T) -> io::Result<()>;
 
-    /// Read a struct from the USART. This will block until the entire struct is received.
-    fn read_struct<T>(&mut self) -> io::Result<T>;
-
     /// Try to read a struct from serial. This won't block to wait for the start byte, but fail if the start byte is not received.
-    fn try_read_struct<T>(&mut self) -> io::Result<T>;
+    fn try_read_struct_from_stream<T>(&mut self, stream: &mut Vec<u8>) -> io::Result<Option<T>>;
 
     /// Write an event over the USART.
     fn write_command(&mut self, event: HardwareCommand) -> io::Result<()>;
 
-    /// Read a command from the USART. This will block until the entire command is received.
-    fn read_event(&mut self) -> io::Result<HardwareEvent>;
-
     /// Try to read a command from the USART. This won't block to wait for the start byte, but fail if the start byte is not received.
-    fn try_read_event(&mut self) -> io::Result<HardwareEvent>;
+    fn try_read_event_from_stream(
+        &mut self,
+        stream: &mut Vec<u8>,
+    ) -> io::Result<Option<HardwareEvent>>;
+
+    fn read_debug_message(&mut self, len: usize) -> io::Result<String>;
 }
 
 impl SerialExt for Box<dyn SerialPort> {
@@ -51,90 +50,54 @@ impl SerialExt for Box<dyn SerialPort> {
         Ok(())
     }
 
-    fn read_struct<T>(&mut self) -> io::Result<T> {
-        let mut start_byte_buf = [0_u8];
+    fn try_read_struct_from_stream<T>(&mut self, stream: &mut Vec<u8>) -> io::Result<Option<T>> {
         loop {
-            self.read_exact(&mut start_byte_buf)?;
-            if start_byte_buf[0] == SERIAL_START_BYTE {
-                break;
+            if stream.len() < 1 {
+                return Ok(None);
             }
+
+            // look for start byte
+            if stream[0] != SERIAL_START_BYTE {
+                // skip invalid byte
+                stream.remove(0);
+                continue;
+            }
+
+            // needs at least 4 bytes (size + checksum)
+            if stream.len() < 4 {
+                return Ok(None);
+            }
+
+            let size = u16::from_le_bytes([stream[1], stream[2]]) as usize;
+
+            if stream.len() < 3 + size + 1 {
+                // the full message hasn't arrived yet
+                return Ok(None);
+            }
+
+            let payload = &stream[3..3 + size];
+            let checksum = stream[3 + size];
+
+            let calculated_checksum = payload
+                .iter()
+                .fold(0, |acc: u8, &byte| acc.wrapping_add(byte));
+
+            if checksum != calculated_checksum {
+                // invalid checksum -> skip the start byte and resync
+                stream.remove(0);
+                continue;
+            }
+
+            if size != std::mem::size_of::<T>() {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid size"));
+            }
+
+            let value = unsafe { std::ptr::read(payload.as_ptr() as *const T) };
+
+            stream.drain(0..(3 + size + 1));
+
+            return Ok(Some(value));
         }
-
-        let mut size_buf = [0_u8; 2];
-        self.read_exact(&mut size_buf)?;
-        let size = u16::from_le_bytes(size_buf);
-        let size = size as usize;
-
-        if size != std::mem::size_of::<T>() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid size"));
-        }
-
-        let mut buffer = vec![0; size];
-
-        self.read_exact(&mut buffer)?;
-
-        let mut checksum_buf = [0_u8; 1];
-        self.read_exact(&mut checksum_buf)?;
-        let checksum = checksum_buf[0];
-
-        let calculated_checksum = buffer
-            .iter()
-            .fold(0, |acc: u8, &byte| acc.wrapping_add(byte));
-
-        if checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid checksum",
-            ));
-        }
-
-        let value = unsafe { std::ptr::read(buffer.as_ptr() as *const T) };
-
-        Ok(value)
-    }
-
-    fn try_read_struct<T>(&mut self) -> io::Result<T> {
-        let mut start_byte_buf = [0_u8];
-        self.read_exact(&mut start_byte_buf)?;
-
-        if start_byte_buf[0] != SERIAL_START_BYTE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid start byte",
-            ));
-        }
-
-        let mut size_buf = [0_u8; 2];
-        self.read_exact(&mut size_buf)?;
-        let size = u16::from_le_bytes(size_buf);
-        let size = size as usize;
-
-        if size != std::mem::size_of::<T>() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid size"));
-        }
-
-        let mut buffer = vec![0; size];
-
-        self.read_exact(&mut buffer)?;
-
-        let mut checksum_buf = [0_u8; 1];
-        self.read_exact(&mut checksum_buf)?;
-        let checksum = checksum_buf[0];
-
-        let calculated_checksum = buffer
-            .iter()
-            .fold(0, |acc: u8, &byte| acc.wrapping_add(byte));
-
-        if checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid checksum",
-            ));
-        }
-
-        let value = unsafe { std::ptr::read(buffer.as_ptr() as *const T) };
-
-        Ok(value)
     }
 
     fn write_command(&mut self, command: HardwareCommand) -> io::Result<()> {
@@ -142,13 +105,34 @@ impl SerialExt for Box<dyn SerialPort> {
         self.write_struct(&command_struct)
     }
 
-    fn read_event(&mut self) -> io::Result<HardwareEvent> {
-        let event_struct: HardwareEventStruct = self.read_struct()?;
-        Ok(event_struct.into())
+    fn try_read_event_from_stream(
+        &mut self,
+        stream: &mut Vec<u8>,
+    ) -> io::Result<Option<HardwareEvent>> {
+        let event_struct: Option<HardwareEventStruct> = self.try_read_struct_from_stream(stream)?;
+        Ok(event_struct.map(|o| o.into()))
     }
 
-    fn try_read_event(&mut self) -> io::Result<HardwareEvent> {
-        let event_struct: HardwareEventStruct = self.try_read_struct()?;
-        Ok(event_struct.into())
+    fn read_debug_message(&mut self, len: usize) -> io::Result<String> {
+        let mut start_byte_buf = [0_u8];
+        loop {
+            match self.read_exact(&mut start_byte_buf) {
+                Ok(()) => {}
+                Err(err) if err.kind() == io::ErrorKind::TimedOut => continue,
+                Err(err) => return Err(err),
+            };
+
+            if start_byte_buf[0] == SERIAL_START_BYTE {
+                break;
+            }
+        }
+
+        let mut message_buf = vec![0_u8; len];
+        self.read_exact(&mut message_buf)?;
+
+        let str = String::from_utf8(message_buf)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))?;
+
+        Ok(str)
     }
 }

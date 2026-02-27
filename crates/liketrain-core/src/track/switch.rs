@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use liketrain_hardware::event::{HardwareSwitchId, HardwareSwitchState};
+use liketrain_hardware::event::{
+    HARDWARE_SWITCH_ID_MAX_LEN, HardwareSwitchId, HardwareSwitchState,
+};
 
 use crate::{SectionEnd, SectionId, Track};
 
@@ -30,7 +32,13 @@ impl TryFrom<SwitchId> for HardwareSwitchId {
 
     fn try_from(value: SwitchId) -> Result<Self, Self::Error> {
         let bytes = value.0.as_bytes();
-        bytes.try_into().map_err(|_| ())
+        if bytes.len() > HARDWARE_SWITCH_ID_MAX_LEN {
+            return Err(());
+        }
+
+        let mut hw_id = [0_u8; HARDWARE_SWITCH_ID_MAX_LEN];
+        hw_id[..bytes.len()].copy_from_slice(bytes);
+        Ok(hw_id)
     }
 }
 

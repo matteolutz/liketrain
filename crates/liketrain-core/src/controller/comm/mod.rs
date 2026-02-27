@@ -1,5 +1,8 @@
 use liketrain_hardware::{command::HardwareCommand, event::HardwareEvent};
 
+mod serial;
+pub use serial::*;
+
 use crate::ControllerError;
 
 pub struct ControllerHardwareCommunicationChannels {

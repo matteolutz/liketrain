@@ -6,6 +6,7 @@ pub enum HardwareCommandType {
     Ping = 0,
     SetSectionPower = 1,
     SetSwitchState = 2,
+    ResetAll = 99,
 }
 
 #[repr(C, packed)]
@@ -27,6 +28,7 @@ pub union HardwareCommandUnion {
     pub ping: (u32, u32),
     pub set_section_power: HardwareCommandSetSectionPower,
     pub set_switch_state: HardwareCommandSetSwitchState,
+    pub reset_all: (),
 }
 
 #[repr(C, packed)]
@@ -62,6 +64,13 @@ impl HardwareCommandStruct {
             },
         }
     }
+
+    pub fn reset_all() -> Self {
+        Self {
+            tag: HardwareCommandType::ResetAll,
+            data: HardwareCommandUnion { reset_all: () },
+        }
+    }
 }
 
 impl From<HardwareCommand> for HardwareCommandStruct {
@@ -74,6 +83,7 @@ impl From<HardwareCommand> for HardwareCommandStruct {
             HardwareCommand::SetSwitchState { switch_id, state } => {
                 Self::set_switch_state(switch_id, state)
             }
+            HardwareCommand::ResetAll => Self::reset_all(),
         }
     }
 }
@@ -99,6 +109,7 @@ impl From<HardwareCommandStruct> for HardwareCommand {
                     state: value.data.set_switch_state.state,
                 }
             },
+            HardwareCommandType::ResetAll => HardwareCommand::ResetAll,
         }
     }
 }

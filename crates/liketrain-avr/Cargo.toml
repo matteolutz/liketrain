@@ -28,6 +28,10 @@ features = ["arduino-mega2560"]
 version = "0.8.1"
 features = ["atmega2560"]
 
+[features]
+default = ["sim"]
+sim = []
+
 [profile.dev]
 panic = "abort"
 lto = true

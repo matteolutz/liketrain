@@ -1,10 +1,29 @@
+#[cfg(feature = "avr")]
+use alloc::string::ToString;
+
 use crate::event::{HardwareEvent, HardwareSwitchId, HardwareSwitchState, SectionEvent};
 
 #[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum HardwareEventType {
     Pong = 0,
     SectionEvent = 1,
     SwitchStateChange = 2,
+    DebugMessage = 99,
+}
+
+impl TryFrom<u8> for HardwareEventType {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(HardwareEventType::Pong),
+            1 => Ok(HardwareEventType::SectionEvent),
+            2 => Ok(HardwareEventType::SwitchStateChange),
+            99 => Ok(HardwareEventType::DebugMessage),
+            _ => Err(()),
+        }
+    }
 }
 
 #[repr(C, packed)]
@@ -19,6 +38,7 @@ pub union HardwareEventUnion {
     pub pong: (u32, u32),
     pub section_event: SectionEvent,
     pub switch_state_change: HardwareEventSwitchStateChange,
+    pub debug_message: u32,
 }
 
 #[repr(C, packed)]
@@ -54,6 +74,13 @@ impl HardwareEventStruct {
             },
         }
     }
+
+    pub fn debug_message(len: u32) -> Self {
+        Self {
+            tag: HardwareEventType::DebugMessage,
+            data: HardwareEventUnion { debug_message: len },
+        }
+    }
 }
 
 impl From<HardwareEvent> for HardwareEventStruct {
@@ -64,6 +91,7 @@ impl From<HardwareEvent> for HardwareEventStruct {
             HardwareEvent::SwitchStateChanged { switch_id, state } => {
                 Self::switch_state_change(HardwareEventSwitchStateChange { switch_id, state })
             }
+            HardwareEvent::DebugMessage { .. } => Self::debug_message(0),
         }
     }
 }
@@ -84,6 +112,11 @@ impl From<HardwareEventStruct> for HardwareEvent {
                 HardwareEvent::SwitchStateChanged {
                     switch_id: value.data.switch_state_change.switch_id,
                     state: value.data.switch_state_change.state,
+                }
+            },
+            HardwareEventType::DebugMessage => unsafe {
+                HardwareEvent::DebugMessage {
+                    message: "".to_string(),
                 }
             },
         }

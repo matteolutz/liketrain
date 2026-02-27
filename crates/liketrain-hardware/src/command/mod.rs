@@ -18,4 +18,6 @@ pub enum HardwareCommand {
         switch_id: HardwareSwitchId,
         state: HardwareSwitchState,
     },
+
+    ResetAll,
 }

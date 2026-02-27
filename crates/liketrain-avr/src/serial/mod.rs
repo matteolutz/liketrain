@@ -1,16 +1,30 @@
 use core::mem::MaybeUninit;
 
-use arduino_hal::{Usart, hal::Atmega, prelude::_embedded_hal_serial_Read, usart::UsartOps};
+use arduino_hal::{
+    Usart,
+    hal::Atmega,
+    prelude::{_embedded_hal_serial_Read, _embedded_hal_serial_Write},
+    usart::UsartOps,
+};
 use liketrain_hardware::{
     SERIAL_START_BYTE,
     command::{HardwareCommand, avr::HardwareCommandStruct},
+    deser::{Deser, DeserHelper},
     event::{HardwareEvent, avr::HardwareEventStruct},
 };
+use ufmt::uWrite;
 
 use crate::mode::{SlaveCommand, SlaveResponse};
 
 pub trait UsartExt {
     type Error;
+
+    fn checksum(data: impl IntoIterator<Item = u8>) -> u8 {
+        data.into_iter().fold(0, |acc, byte| acc.wrapping_add(byte))
+    }
+
+    fn write_deser<T: Deser>(&mut self, data: &T) -> Result<(), Self::Error>;
+    fn read_deser<T: Deser>(&mut self) -> Result<T, Self::Error>;
 
     /// Write a struct over the USART.
     fn write_struct<T>(&mut self, struct_data: &T) -> Result<(), Self::Error>;
@@ -131,10 +145,32 @@ pub trait UsartExt {
     fn try_read_slave_response(&mut self) -> Result<SlaveResponse, Self::Error> {
         self.try_read_struct()
     }
+
+    fn write_debug_message(&mut self, message: &str) -> Result<(), Self::Error>;
 }
 
 impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> {
     type Error = ();
+
+    fn write_deser<T: Deser>(&mut self, data: &T) -> Result<(), Self::Error> {
+        let data = data.serialize().map_err(|_| ())?;
+        let data_size: u32 = data.len() as u32;
+
+        self.write_byte(SERIAL_START_BYTE);
+
+        for byte in data_size.to_le_bytes() {
+            self.write_byte(byte);
+        }
+
+        for &byte in &data {
+            self.write_byte(byte);
+        }
+
+        let checksum = Self::checksum(data);
+        self.write_byte(checksum);
+
+        Ok(())
+    }
 
     fn write_struct<T>(&mut self, struct_data: &T) -> Result<(), Self::Error> {
         let size = core::mem::size_of::<T>();
@@ -237,5 +273,22 @@ impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> UsartExt for Usart<USART, RX, TX> 
 
         let value = unsafe { buffer.assume_init() };
         Ok(value)
+    }
+
+    fn write_debug_message(&mut self, message: &str) -> Result<(), Self::Error> {
+        let bytes = message.as_bytes();
+
+        /*
+        self.write_event(HardwareEvent::DebugMessage {
+            len: bytes.len() as u32,
+        })?;*/
+
+        self.write_byte(SERIAL_START_BYTE);
+        for byte in bytes {
+            self.write_byte(*byte);
+        }
+
+        self.flush();
+        Ok(())
     }
 }

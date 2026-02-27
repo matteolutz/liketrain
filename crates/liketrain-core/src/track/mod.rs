@@ -24,6 +24,14 @@ pub struct Track {
 }
 
 impl Track {
+    pub fn section_ids(&self) -> impl Iterator<Item = SectionId> {
+        self.sections.keys().copied()
+    }
+
+    pub fn sections(&self) -> impl Iterator<Item = (SectionId, &Section)> {
+        self.sections.iter().map(|(id, section)| (*id, section))
+    }
+
     pub fn section(&self, section_id: &SectionId) -> Option<&Section> {
         self.sections.get(section_id)
     }

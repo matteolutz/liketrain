@@ -8,6 +8,12 @@ pub enum HardwareSectionPower {
     Full = 4,
 }
 
+impl HardwareSectionPower {
+    pub fn is_off(&self) -> bool {
+        *self == HardwareSectionPower::Off
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
 pub enum SectionEventType {

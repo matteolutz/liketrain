@@ -1,6 +1,7 @@
 use chumsky::Parser;
 use liketrain_core::{
-    Direction, Route,
+    Controller, ControllerConfig, Direction, Route, Train,
+    comm::SerialControllerHardwareCommunication,
     parser::{eval::Evaluator, parser},
 };
 
@@ -67,4 +68,41 @@ fn test_route_validation() {
     };
 
     println!("Route 2 valid: {}", r2.pretty_print(&track));
+}
+
+#[test]
+fn test_controller() {
+    #[cfg(debug_assertions)]
+    {
+        if std::env::var("RUST_LOG").is_err() {
+            unsafe { std::env::set_var("RUST_LOG", "debug") }
+        }
+    }
+
+    env_logger::init();
+
+    log::debug!("testing logger");
+
+    let result = parser().parse(TTL).into_result();
+    let track_defs = result.unwrap();
+
+    let eval = Evaluator::default();
+    let track = eval.evaluate(track_defs).unwrap();
+
+    let Some(r1) = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track) else {
+        assert!(false, "Route 1 failed");
+        return;
+    };
+
+    println!("Route 1 valid: {}", r1.pretty_print(&track));
+
+    let hardware_comm = SerialControllerHardwareCommunication::new("COM3", 115200);
+
+    let controller_config = ControllerConfig {
+        track,
+        trains: [(1_u32.into(), Train::from_route("RE5".into(), r1))].into(),
+    };
+
+    let controller = Controller::new(controller_config, hardware_comm);
+    controller.start().unwrap();
 }

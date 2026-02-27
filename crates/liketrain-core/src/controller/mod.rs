@@ -12,7 +12,7 @@ use liketrain_hardware::{
 };
 pub use state::*;
 
-mod comm;
+pub mod comm;
 
 mod error;
 pub use error::*;
@@ -31,11 +31,14 @@ pub struct ControllerConfig {
 #[derive(Copy, Clone)]
 struct EventExecutionContext<'a> {
     command_tx: &'a crossbeam::channel::Sender<HardwareCommand>,
+    event_rx: &'a crossbeam::channel::Receiver<HardwareEvent>,
 }
 
 impl<'a> EventExecutionContext<'a> {
     pub fn exec(&self, command: impl Into<HardwareCommand>) -> Result<(), ControllerError> {
         let command = command.into();
+        log::debug!("sending hw command: {:?}", command);
+
         self.command_tx.send(command)?;
         Ok(())
     }
@@ -220,6 +223,7 @@ impl Controller {
             HardwareEvent::Pong { slave_id, seq } => {
                 println!("received pong from slave {} with seq {}", slave_id, seq)
             }
+            HardwareEvent::DebugMessage { .. } => {} // is handled by underlying implementation
         }
         Ok(())
     }
@@ -344,6 +348,7 @@ impl Controller {
         ctx: EventExecutionContext,
     ) -> Result<(), ControllerError> {
         let event = event.into();
+        log::debug!("handling event: {:?}", event);
 
         match event {
             ControllerEvent::Scheduled(scheduled_event) => {
@@ -370,8 +375,59 @@ impl Controller {
         Ok(())
     }
 
+    fn init(&mut self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
+        let ping_seq = 1337;
+
+        // ping the master
+        log::debug!("sending ping to master");
+        ctx.exec(HardwareCommand::Ping {
+            slave_id: 0,
+            seq: ping_seq,
+        })?;
+
+        if let HardwareEvent::Pong { slave_id, seq } = ctx.event_rx.recv()?
+            && slave_id == 0
+            && seq == ping_seq
+        {
+            log::debug!("received pong from master");
+            // okay, we received the correct pong
+        } else {
+            return Err(ControllerError::ExpectedHardwareEvent(
+                HardwareEvent::Pong {
+                    slave_id: 0,
+                    seq: ping_seq,
+                },
+            ));
+        };
+
+        // reset everything
+        ctx.exec(HardwareCommand::ResetAll)?;
+
+        // initialize all the trains
+        for (&id, train) in &self.trains {
+            let Some(current_section) = train.get_current_section() else {
+                continue;
+            };
+
+            // power on the current section
+            ctx.exec(HardwareCommand::SetSectionPower {
+                section_id: current_section.as_u32(),
+                power: HardwareSectionPower::Full,
+            })?;
+
+            // this will set the next switches and power to the next section
+            self.scheduler
+                .schedule_now(ScheduledEvent::TrainEnteredSection {
+                    train_id: id,
+                    section_id: current_section,
+                });
+        }
+
+        Ok(())
+    }
+
     pub fn start(mut self) -> Result<(), ControllerError> {
-        let (mut command_tx, command_rx) = crossbeam::channel::unbounded();
+        let (command_tx, command_rx) = crossbeam::channel::unbounded();
         let (event_tx, event_rx) = crossbeam::channel::unbounded();
 
         // start the hardware communication
@@ -381,12 +437,16 @@ impl Controller {
                 command_rx,
             })?;
 
+        let ctx = EventExecutionContext {
+            command_tx: &command_tx,
+            event_rx: &event_rx,
+        };
+
+        // initialize the controller
+        self.init(ctx)?;
+
         // main loop
         loop {
-            let ctx = EventExecutionContext {
-                command_tx: &mut command_tx,
-            };
-
             if let Some(event_timeout) = self.scheduler.next_event_duration() {
                 crossbeam::select! {
                     recv(event_rx) -> event => {

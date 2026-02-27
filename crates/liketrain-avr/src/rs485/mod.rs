@@ -59,4 +59,11 @@ where
             .try_read_struct()
             .map_err(|_| Rs485Error::SerialError)
     }
+
+    fn write_debug_message(&mut self, message: &str) -> Result<(), Self::Error> {
+        self.transmit()?;
+        self.serial
+            .write_debug_message(message)
+            .map_err(|_| Rs485Error::SerialError)
+    }
 }
