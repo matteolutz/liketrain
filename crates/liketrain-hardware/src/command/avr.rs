@@ -2,11 +2,32 @@ use crate::command::HardwareCommand;
 use crate::event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState};
 
 #[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum HardwareCommandType {
     Ping = 0,
     SetSectionPower = 1,
     SetSwitchState = 2,
     ResetAll = 99,
+}
+
+impl Into<u8> for HardwareCommandType {
+    fn into(self) -> u8 {
+        self as u8
+    }
+}
+
+impl TryFrom<u8> for HardwareCommandType {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(HardwareCommandType::Ping),
+            1 => Ok(HardwareCommandType::SetSectionPower),
+            2 => Ok(HardwareCommandType::SetSwitchState),
+            99 => Ok(HardwareCommandType::ResetAll),
+            _ => Err(()),
+        }
+    }
 }
 
 #[repr(C, packed)]

@@ -2,6 +2,8 @@ use crate::event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState};
 
 pub mod avr;
 
+pub mod deser;
+
 #[derive(Debug)]
 pub enum HardwareCommand {
     Ping {

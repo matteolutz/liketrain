@@ -1,4 +1,6 @@
 #[cfg(feature = "avr")]
+use alloc::string::String;
+#[cfg(feature = "avr")]
 use alloc::vec::Vec;
 
 use crate::{
@@ -36,7 +38,7 @@ impl Deser for HardwareEvent {
 
     fn deser_deserialize(
         variant: Self::Variant,
-        _payload_size: u32,
+        payload_size: u32,
         mut payload: DeserPayloadReader,
     ) -> Result<Self, DeserError<Self::Error>> {
         match variant {
@@ -55,7 +57,17 @@ impl Deser for HardwareEvent {
 
                 Ok(Self::SwitchStateChanged { switch_id, state })
             }
-            HardwareEventType::DebugMessage => Err(().into()),
+            HardwareEventType::DebugMessage => {
+                let mut bytes = Vec::with_capacity(payload_size as usize);
+
+                for _ in 0..payload_size {
+                    bytes.push(payload.parse_u8()?);
+                }
+
+                let message = String::from_utf8(bytes).map_err(|_| ())?;
+
+                Ok(HardwareEvent::DebugMessage { message })
+            }
         }
     }
 

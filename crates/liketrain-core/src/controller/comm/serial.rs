@@ -1,9 +1,12 @@
-use std::{io, time::Duration};
+use std::time::Duration;
 
 use crossbeam::{channel::tick, select};
-use liketrain_hardware::event::HardwareEvent;
+use liketrain_hardware::{
+    event::HardwareEvent,
+    serial::{DeserSerialExt, Serial},
+};
 
-use crate::{controller::comm::ControllerHardwareCommunication, serial::SerialExt};
+use crate::{controller::comm::ControllerHardwareCommunication, serial::SerialportSerialInterface};
 
 pub struct SerialControllerHardwareCommunication {
     port_name: String,
@@ -24,42 +27,37 @@ impl ControllerHardwareCommunication for SerialControllerHardwareCommunication {
         &self,
         channels: super::ControllerHardwareCommunicationChannels,
     ) -> Result<(), crate::ControllerError> {
-        let mut port = serialport::new(&self.port_name, self.baud_rate)
+        let port = serialport::new(&self.port_name, self.baud_rate)
             .timeout(Duration::from_millis(20))
             .open()?;
 
         std::thread::spawn(move || {
-            let ticker = tick(Duration::from_millis(10));
+            let mut interface: SerialportSerialInterface = port.into();
+            let mut serial = Serial::new(&mut interface);
 
-            let mut stream_buffer = Vec::new();
-            let mut read_buf = [0_u8; 64];
+            let ticker = tick(Duration::from_millis(10));
 
             loop {
                 select! {
                     recv(channels.command_rx) -> command => {
                         if let Ok(command) = command {
-                            let _ = port.write_command(command).unwrap();
+                            log::debug!("sending command: {:?}", command);
+                            serial.write(&command).unwrap();
                         }
                     }
                     recv(ticker) -> _ => {
-                        match port.read(&mut read_buf) {
-                            Ok(n) if n > 0 => {
-                                stream_buffer.extend_from_slice(&read_buf[..n]);
+                        serial.update().unwrap();
 
-                                while let Some(event) = port.try_read_event_from_stream(&mut stream_buffer).unwrap() {
-                                    match &event {
-                                        &HardwareEvent::DebugMessage { len } => {
-                                            let message = port.read_debug_message(len as usize).unwrap();
-                                            log::info!("Debug message: {}", message);
-                                        },
-                                        _=> {}
-                                    }
-                                    let _ = channels.event_tx.send(event);
-                                }
-                            }
-                            Err(err) if err.kind() == io::ErrorKind::TimedOut => {},
-                            Err(err) => log::warn!("Failed to read from serial port: {}", err),
-                            _ => {}
+                        while let Some(event) = serial.read::<HardwareEvent>().unwrap() {
+                            match event {
+                                   HardwareEvent::DebugMessage { message } => {
+                                       log::info!("Debug message: {}", message);
+                                   },
+                                   event => {
+                                       let _ = channels.event_tx.send(event);
+                                   }
+                               }
+
                         }
                     }
                 }

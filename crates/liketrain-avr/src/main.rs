@@ -6,11 +6,15 @@ extern crate alloc;
 
 use core::cell::Cell;
 
-use alloc::vec::Vec;
+use alloc::{format, string::ToString, vec::Vec};
 use arduino_hal::Usart;
 use avr_device::interrupt::Mutex;
 use embedded_alloc::LlffHeap;
-use liketrain_hardware::command::HardwareCommand;
+use liketrain_hardware::{
+    command::HardwareCommand,
+    event::HardwareEvent,
+    serial::{DeserSerialExt, Serial},
+};
 use panic_halt as _;
 
 #[cfg(feature = "sim")]
@@ -19,7 +23,7 @@ use crate::{
     command::{CommandExecutionContext, CommandExt},
     mode::{LiketrainMode, SlaveCommand, SlaveId, SlaveResponse},
     rs485::Rs485,
-    serial::UsartExt,
+    serial::UsartInterface,
     track::{Section, SectionDelegate, SectionPowerRelais},
 };
 
@@ -73,6 +77,8 @@ fn main() -> ! {
         avr_device::interrupt::enable();
     }
 
+    let mut builtin_in = pins.d13.into_output();
+
     let mut section_24 = Section::new(
         24,
         SectionPowerRelais::new(
@@ -94,7 +100,7 @@ fn main() -> ! {
             pins.d12.into_output(),
         )
         .unwrap(),
-        pins.d13,
+        pins.d26,
     );
 
     let mut section_21 = Section::new(
@@ -118,6 +124,8 @@ fn main() -> ! {
         SimTrain::new([(24, 5000), (22, 5000), (21, 5000), (24, 5000)]);
 
     let mut usb_serial = arduino_hal::default_serial!(dp, pins, 115200);
+    let mut usb_serial_interface = UsartInterface::from(usb_serial);
+    let mut usb_serial = Serial::new(&mut usb_serial_interface);
 
     let mut serial_one = Usart::new(dp.USART1, pins.d19, pins.d18.into_output(), 115200.into());
     let mut rs485 = Rs485::new(pins.d2.into_output(), &mut serial_one);
@@ -137,7 +145,12 @@ fn main() -> ! {
         // receive incoming commands, if slave, send events when requested
         match MODE {
             LiketrainMode::Master => {
-                while let Ok(command) = usb_serial.try_read_command() {
+                // usb_serial.interface_mut().print("working");
+                let _ = usb_serial.update();
+
+                while let Some(command) = usb_serial.read::<HardwareCommand>().ok().flatten() {
+                    execution_ctx.debug("got command");
+
                     let Ok(was_handled) = command.execute(&mut execution_ctx) else {
                         continue;
                     };
@@ -148,6 +161,7 @@ fn main() -> ! {
                 }
             }
             LiketrainMode::Slave { slave_id } => {
+                /*
                 while let Ok(slave_command) = rs485.try_read_slave_command() {
                     match slave_command {
                         SlaveCommand::Command(command) => {
@@ -169,12 +183,13 @@ fn main() -> ! {
                         _ => {}
                     }
                 }
+                */
             }
         }
 
         // send unhandled commands to slave bus
         if MODE.is_master() {
-            let _ = rs485.write_slave_commands(slave_commands.drain(..).map(|cmd| cmd.into()));
+            // let _ = rs485.write_slave_commands(slave_commands.drain(..).map(|cmd| cmd.into()));
         }
 
         // update sim trains
@@ -188,6 +203,7 @@ fn main() -> ! {
 
         // poll slaves
         if MODE.is_master() {
+            /*
             for slave_id in &slave_ids {
                 let _ = rs485.write_slave_command(SlaveCommand::EventPoll {
                     slave_id: *slave_id,
@@ -209,15 +225,20 @@ fn main() -> ! {
                     execution_ctx.event_list.push(event.into());
                 }
             }
+            ´*/
         }
 
         // send events back to master or host
         match MODE {
             LiketrainMode::Master => {
-                let _ = usb_serial.write_events(execution_ctx.event_list.drain(..));
+                if !execution_ctx.event_list.is_empty() {}
 
-                for msg in execution_ctx.debug_messages.drain(..) {
-                    let _ = usb_serial.write_debug_message(&msg);
+                for event in execution_ctx.event_list.drain(..) {
+                    let _ = usb_serial.write(&event);
+                }
+
+                for message in execution_ctx.debug_messages.drain(..) {
+                    let _ = usb_serial.write(&HardwareEvent::DebugMessage { message });
                 }
             }
             LiketrainMode::Slave { .. } => {

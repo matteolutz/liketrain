@@ -26,7 +26,7 @@ impl DeserPayloadReader<'_> {
     pub fn parse_u8<E: core::fmt::Debug>(&mut self) -> Result<u8, DeserError<E>> {
         let result = self
             .0
-            .get(0)
+            .first()
             .copied()
             .ok_or(DeserError::UnexpectedEndOfBuffer)?;
         self.0 = &self.0[1..];
@@ -130,7 +130,7 @@ impl<E: core::fmt::Debug> From<E> for DeserError<E> {
 
 pub trait Deser: Sized {
     /// The variants enum of this message type
-    type Variant: Copy + Clone + TryFrom<u8>;
+    type Variant: Copy + Clone + TryFrom<u8> + Into<u8>;
 
     type Error: core::fmt::Debug;
 
@@ -165,13 +165,16 @@ impl<T: Deser> DeserHelper<T> for T {
         let mut buffer = Vec::new();
         let mut size_written = false;
 
-        let writer = DeserPayloadWriter {
+        let mut writer = DeserPayloadWriter {
             buffer: &mut buffer,
             size_written: &mut size_written,
         };
 
         let variant = self.variant();
         let size = Self::payload_size(variant);
+
+        let variant_byte: u8 = variant.into();
+        writer.write_u8(variant_byte)?;
 
         self.deser_serialize(writer)?;
 

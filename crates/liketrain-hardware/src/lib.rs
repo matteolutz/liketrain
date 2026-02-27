@@ -10,3 +10,5 @@ pub mod command;
 pub mod event;
 
 pub mod deser;
+
+pub mod serial;

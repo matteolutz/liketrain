@@ -12,6 +12,12 @@ pub enum HardwareEventType {
     DebugMessage = 99,
 }
 
+impl Into<u8> for HardwareEventType {
+    fn into(self) -> u8 {
+        self as u8
+    }
+}
+
 impl TryFrom<u8> for HardwareEventType {
     type Error = ();
 

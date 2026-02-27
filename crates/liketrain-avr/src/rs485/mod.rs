@@ -39,31 +39,20 @@ where
 {
     type Error = Rs485Error;
 
-    fn write_struct<T>(&mut self, struct_data: &T) -> Result<(), Self::Error> {
+    fn write_deser<T: liketrain_hardware::deser::Deser>(
+        &mut self,
+        data: &T,
+    ) -> Result<(), Self::Error> {
         self.transmit()?;
         self.serial
-            .write_struct(struct_data)
+            .write_deser(data)
             .map_err(|_| Rs485Error::SerialError)
     }
 
-    fn read_struct<T>(&mut self) -> Result<T, Self::Error> {
-        self.receive()?;
-        self.serial
-            .read_struct()
-            .map_err(|_| Rs485Error::SerialError)
-    }
-
-    fn try_read_struct<T>(&mut self) -> Result<T, Self::Error> {
-        self.receive()?;
-        self.serial
-            .try_read_struct()
-            .map_err(|_| Rs485Error::SerialError)
-    }
-
-    fn write_debug_message(&mut self, message: &str) -> Result<(), Self::Error> {
-        self.transmit()?;
-        self.serial
-            .write_debug_message(message)
+    fn try_read_deser_from_stream<T: liketrain_hardware::deser::Deser>(
+        stream: crate::serial::UartStream,
+    ) -> Result<Option<T>, Self::Error> {
+        Usart::<USART, RX, TX>::try_read_deser_from_stream(stream)
             .map_err(|_| Rs485Error::SerialError)
     }
 }

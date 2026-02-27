@@ -52,7 +52,7 @@ impl SerialExt for Box<dyn SerialPort> {
 
     fn try_read_struct_from_stream<T>(&mut self, stream: &mut Vec<u8>) -> io::Result<Option<T>> {
         loop {
-            if stream.len() < 1 {
+            if stream.is_empty() {
                 return Ok(None);
             }
 
