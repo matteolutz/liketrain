@@ -156,6 +156,8 @@ fn main() -> ! {
                     if !was_handled {
                         slave_commands.push(command);
                     }
+
+                    let _ = usb_serial.write(&HardwareEvent::Ack);
                 }
             }
             LiketrainMode::Slave { slave_id } => {

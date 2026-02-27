@@ -7,6 +7,7 @@ use liketrain_hardware::{
     deser::{Deser, DeserHelper},
     serial::SerialInterface,
 };
+use ufmt::uWrite;
 
 pub struct UsartInterface<USART: UsartOps<Atmega, RX, TX>, RX, TX>(Usart<USART, RX, TX>);
 

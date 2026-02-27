@@ -24,6 +24,7 @@ impl Deser for HardwareEvent {
             HardwareEventType::SwitchStateChange => {
                 core::mem::size_of::<HardwareEventSwitchStateChange>().into()
             }
+            HardwareEventType::Ack => 0.into(),
         }
     }
 
@@ -33,6 +34,7 @@ impl Deser for HardwareEvent {
             Self::SectionEvent { .. } => HardwareEventType::SectionEvent,
             Self::Pong { .. } => HardwareEventType::Pong,
             Self::SwitchStateChanged { .. } => HardwareEventType::SwitchStateChange,
+            Self::Ack => HardwareEventType::Ack,
         }
     }
 
@@ -68,6 +70,7 @@ impl Deser for HardwareEvent {
 
                 Ok(HardwareEvent::DebugMessage { message })
             }
+            HardwareEventType::Ack => Ok(HardwareEvent::Ack),
         }
     }
 
@@ -100,6 +103,7 @@ impl Deser for HardwareEvent {
                 buffer.write(state)?;
                 Ok(())
             }
+            Self::Ack => Ok(()),
         }
     }
 }

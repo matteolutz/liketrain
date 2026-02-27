@@ -223,7 +223,7 @@ impl Controller {
             HardwareEvent::Pong { slave_id, seq } => {
                 println!("received pong from slave {} with seq {}", slave_id, seq)
             }
-            HardwareEvent::DebugMessage { .. } => {} // is handled by underlying implementation
+            HardwareEvent::DebugMessage { .. } | HardwareEvent::Ack => {} // is handled by underlying implementation
         }
         Ok(())
     }

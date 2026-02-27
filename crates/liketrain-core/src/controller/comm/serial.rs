@@ -6,7 +6,10 @@ use liketrain_hardware::{
     serial::{DeserSerialExt, Serial},
 };
 
-use crate::{controller::comm::ControllerHardwareCommunication, serial::SerialportSerialInterface};
+use crate::{
+    comm::flow::SerialFlowController, controller::comm::ControllerHardwareCommunication,
+    serial::SerialportSerialInterface,
+};
 
 pub struct SerialControllerHardwareCommunication {
     port_name: String,
@@ -35,13 +38,15 @@ impl ControllerHardwareCommunication for SerialControllerHardwareCommunication {
             let mut interface: SerialportSerialInterface = port.into();
             let mut serial = Serial::new(&mut interface);
 
-            let ticker = tick(Duration::from_millis(50));
+            let mut flow = SerialFlowController::new();
+
+            let ticker = tick(Duration::from_millis(10));
 
             loop {
                 select! {
                     recv(channels.command_rx) -> command => {
                         if let Ok(command) = command {
-                            serial.write(&command).unwrap();
+                            flow.push_command(command);
                         }
                     }
                     recv(ticker) -> _ => {
@@ -52,11 +57,17 @@ impl ControllerHardwareCommunication for SerialControllerHardwareCommunication {
                                    HardwareEvent::DebugMessage { message } => {
                                        log::info!("Debug message: {}", message);
                                    },
+                                   HardwareEvent::Ack  => {
+                                       flow.ack_received();
+                                   }
                                    event => {
                                        let _ = channels.event_tx.send(event);
                                    }
                                }
+                        }
 
+                        if let Some(command) = flow.update() {
+                            serial.write(&command).unwrap();
                         }
                     }
                 }

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 mod deser;
 pub use deser::*;
 
-const SERIAL_BUFFER_SIZE: usize = 64;
+const SERIAL_BUFFER_SIZE: usize = 128;
 
 pub struct SerialStream(Vec<u8>);
 
@@ -106,6 +106,10 @@ where
 
     pub fn write_byte(&mut self, byte: u8) -> Result<(), SerialError<E>> {
         self.interface.write_byte(byte)
+    }
+
+    pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, SerialError<E>> {
+        self.interface.write_bytes(bytes)
     }
 
     pub fn flush(&mut self) -> Result<(), SerialError<E>> {

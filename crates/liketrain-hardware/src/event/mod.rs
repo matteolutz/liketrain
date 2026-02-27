@@ -33,4 +33,6 @@ pub enum HardwareEvent {
     DebugMessage {
         message: String,
     },
+
+    Ack,
 }

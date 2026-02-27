@@ -1,3 +1,6 @@
+#[cfg(feature = "avr")]
+use alloc::vec::Vec;
+
 use crate::{
     deser::{Deser, DeserError, DeserHelper},
     serial::{Serial, SerialError},
@@ -17,6 +20,8 @@ impl<D: core::fmt::Debug, S: core::fmt::Debug> From<DeserError<D>> for DeserSeri
 
 impl<D: core::fmt::Debug, S: core::fmt::Debug> From<SerialError<S>> for DeserSerialExtError<D, S> {
     fn from(error: SerialError<S>) -> Self {
+        #[cfg(feature = "avr")]
+        use alloc::vec::Vec;
         DeserSerialExtError::SerialError(error)
     }
 }
@@ -38,21 +43,19 @@ where
 {
     fn write<T: Deser>(&mut self, data: &T) -> Result<(), DeserSerialExtError<T::Error, E>> {
         let data = data.serialize()?;
+        let mut buffer = Vec::with_capacity(data.len() + 1 + 4 + 1);
 
         let data_size: u32 = data.len() as u32;
 
-        self.write_byte(Self::DESER_SERIAL_START_BYTE)?;
+        buffer.push(Self::DESER_SERIAL_START_BYTE);
 
-        for byte in data_size.to_le_bytes() {
-            self.write_byte(byte)?;
-        }
-
-        for &byte in &data {
-            self.write_byte(byte)?;
-        }
+        buffer.extend_from_slice(&data_size.to_le_bytes());
+        buffer.extend_from_slice(&data);
 
         let checksum = Self::checksum(data);
-        self.write_byte(checksum)?;
+        buffer.push(checksum);
+
+        self.write_bytes(&buffer)?;
 
         self.flush()?;
 

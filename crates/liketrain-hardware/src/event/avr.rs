@@ -10,6 +10,7 @@ pub enum HardwareEventType {
     SectionEvent = 1,
     SwitchStateChange = 2,
     DebugMessage = 99,
+    Ack = 255,
 }
 
 impl Into<u8> for HardwareEventType {
@@ -27,6 +28,7 @@ impl TryFrom<u8> for HardwareEventType {
             1 => Ok(HardwareEventType::SectionEvent),
             2 => Ok(HardwareEventType::SwitchStateChange),
             99 => Ok(HardwareEventType::DebugMessage),
+            255 => Ok(HardwareEventType::Ack),
             _ => Err(()),
         }
     }
@@ -98,6 +100,7 @@ impl From<HardwareEvent> for HardwareEventStruct {
                 Self::switch_state_change(HardwareEventSwitchStateChange { switch_id, state })
             }
             HardwareEvent::DebugMessage { .. } => Self::debug_message(0),
+            _ => todo!(),
         }
     }
 }
@@ -125,6 +128,7 @@ impl From<HardwareEventStruct> for HardwareEvent {
                     message: "".to_string(),
                 }
             },
+            _ => todo!(),
         }
     }
 }
