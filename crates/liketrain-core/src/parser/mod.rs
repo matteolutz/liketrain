@@ -1,5 +1,7 @@
 use chumsky::prelude::*;
 
+pub use chumsky::Parser;
+
 mod section;
 pub use section::*;
 

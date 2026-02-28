@@ -45,6 +45,10 @@ impl SectionId {
     pub fn as_u32(&self) -> u32 {
         self.0 as u32
     }
+
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
 }
 
 impl std::fmt::Display for SectionId {
