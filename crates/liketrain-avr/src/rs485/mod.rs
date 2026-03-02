@@ -51,9 +51,14 @@ where
         byte: u8,
     ) -> Result<(), liketrain_hardware::serial::SerialError<Self::Error>> {
         self.transmit()?;
+
         self.serial
             .write_byte(byte)
             .map_err(Rs485Error::SerialError)?;
+
+        self.flush()?;
+        self.receive()?;
+
         Ok(())
     }
 
@@ -62,10 +67,15 @@ where
         bytes: &[u8],
     ) -> Result<usize, liketrain_hardware::serial::SerialError<Self::Error>> {
         self.transmit()?;
+
         let bytes_read = self
             .serial
             .write_bytes(bytes)
             .map_err(|e| Rs485Error::SerialError(e))?;
+
+        self.flush()?;
+        self.receive()?;
+
         Ok(bytes_read)
     }
 
@@ -82,7 +92,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), liketrain_hardware::serial::SerialError<Self::Error>> {
-        self.transmit()?;
+        // self.transmit()?;
         self.serial
             .flush()
             .map_err(|e| Rs485Error::SerialError(e))?;
