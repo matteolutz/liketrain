@@ -1,8 +1,3 @@
-use liketrain_hardware::{
-    command::{HardwareCommand, avr::HardwareCommandStruct},
-    event::{HardwareEvent, avr::HardwareEventStruct},
-};
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SlaveId(u32);
 
@@ -42,27 +37,5 @@ impl LiketrainMode {
             LiketrainMode::Master => SlaveId::MASTER_ID,
             LiketrainMode::Slave { slave_id } => slave_id.as_u32(),
         }
-    }
-}
-
-pub enum SlaveCommand {
-    EventPoll { slave_id: SlaveId },
-    Command(HardwareCommandStruct),
-}
-
-impl From<HardwareCommand> for SlaveCommand {
-    fn from(value: HardwareCommand) -> Self {
-        Self::Command(value.into())
-    }
-}
-
-pub enum SlaveResponse {
-    EventCount { count: u32 },
-    Event(HardwareEventStruct),
-}
-
-impl From<HardwareEvent> for SlaveResponse {
-    fn from(value: HardwareEvent) -> Self {
-        Self::Event(value.into())
     }
 }

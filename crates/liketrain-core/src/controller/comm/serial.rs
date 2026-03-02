@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crossbeam::{channel::tick, select};
 use liketrain_hardware::{
-    event::HardwareEvent,
+    response::HardwareResponse,
     serial::{DeserSerialExt, Serial},
 };
 
@@ -52,17 +52,17 @@ impl ControllerHardwareCommunication for SerialControllerHardwareCommunication {
                     recv(ticker) -> _ => {
                         serial.update().unwrap();
 
-                        while let Some(event) = serial.read::<HardwareEvent>().unwrap() {
+                        while let Some(event) = serial.read::<HardwareResponse>().unwrap() {
                             match event {
-                                   HardwareEvent::DebugMessage { message } => {
-                                       log::info!("Debug message: {}", message);
-                                   },
-                                   HardwareEvent::Ack  => {
-                                       flow.ack_received();
-                                   }
-                                   event => {
-                                       let _ = channels.event_tx.send(event);
-                                   }
+                                    HardwareResponse::Event(event) => {
+                                        let _ = channels.event_tx.send(event);
+                                    }
+                                    HardwareResponse::DebugMessage { message } => {
+                                        log::info!("Debug message: {}", message);
+                                    },
+                                    HardwareResponse::Ack  => {
+                                        flow.ack_received();
+                                    }
                                }
                         }
 

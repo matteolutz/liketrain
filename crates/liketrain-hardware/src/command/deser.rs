@@ -1,8 +1,18 @@
 use crate::{
-    command::{HardwareCommand, avr::HardwareCommandType},
+    command::HardwareCommand,
     deser::Deser,
+    deser_variant,
     event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState},
 };
+
+deser_variant! {
+    HardwareCommandType {
+        Ping = 0x0,
+        SetSectionPower = 0x10,
+        SetSwitchState = 0x20,
+        ResetAll = 0x30,
+    }
+}
 
 impl Deser for HardwareCommand {
     type Variant = HardwareCommandType;

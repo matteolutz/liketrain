@@ -19,9 +19,9 @@ impl Render for HelloWorld {
         self.layout.renderer(
             &self.track,
             LayoutRenderConfig {
-                starting_section: 23_usize.into(),
+                starting_section: 22_usize.into(),
                 starting_point: point(px(0.5), px(0.7)),
-                forward_direction: vek::Vec2 { x: 0.0, y: -1.0 },
+                forward_direction: vek::Vec2 { x: 1.0, y: 0.0 },
             },
         )
     }

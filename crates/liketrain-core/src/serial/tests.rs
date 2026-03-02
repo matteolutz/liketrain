@@ -1,14 +1,4 @@
-use std::{
-    sync::{LazyLock, Mutex},
-    time::Duration,
-};
-
-use liketrain_hardware::{
-    command::HardwareCommand,
-    event::{HardwareEvent, HardwareSectionPower, avr::HardwareEventStruct},
-};
-
-use crate::serial::ext::SerialExt;
+use std::sync::{LazyLock, Mutex};
 
 // prevent the tests from running in parallel
 static SERIAL_LOCK: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);

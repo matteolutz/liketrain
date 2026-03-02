@@ -20,8 +20,6 @@ impl<D: core::fmt::Debug, S: core::fmt::Debug> From<DeserError<D>> for DeserSeri
 
 impl<D: core::fmt::Debug, S: core::fmt::Debug> From<SerialError<S>> for DeserSerialExtError<D, S> {
     fn from(error: SerialError<S>) -> Self {
-        #[cfg(feature = "avr")]
-        use alloc::vec::Vec;
         DeserSerialExtError::SerialError(error)
     }
 }
@@ -33,8 +31,16 @@ pub trait DeserSerialExt<E: core::fmt::Debug> {
         data.into_iter().fold(0, |acc, byte| acc.wrapping_add(byte))
     }
 
+    /// Write a [`Deser`] value to the serial interface.
     fn write<T: Deser>(&mut self, data: &T) -> Result<(), DeserSerialExtError<T::Error, E>>;
+
+    /// Read a [`Deser`] value from the serial interface.
+    /// Will return `Ok(None)` if no value is available.
     fn read<T: Deser>(&mut self) -> Result<Option<T>, DeserSerialExtError<T::Error, E>>;
+
+    /// Read a [`Deser`] value from the serial interface.
+    /// Will block until a value is available.
+    fn wait_for<T: Deser>(&mut self) -> Result<T, DeserSerialExtError<T::Error, E>>;
 }
 
 impl<'a, E> DeserSerialExt<E> for Serial<'a, E>
@@ -107,6 +113,16 @@ where
             self.stream_mut().drain(0..(5 + size + 1));
 
             return Ok(Some(data));
+        }
+    }
+
+    fn wait_for<T: Deser>(&mut self) -> Result<T, DeserSerialExtError<T::Error, E>> {
+        loop {
+            self.update()?;
+
+            if let Some(value) = self.read()? {
+                return Ok(value);
+            }
         }
     }
 }

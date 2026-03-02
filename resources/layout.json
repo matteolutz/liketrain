@@ -1,7 +1,46 @@
 {
   "sections": {
-    "S23": [{ "Straight": { "length": 50 } }],
-    "S25": [{ "Straight": { "length": 50 } }],
-    "S26": [{ "Straight": { "length": 50 } }]
+    "S21": {
+      "geometries": [
+        { "Straight": { "length": 100 } },
+        { "Arc": { "offset": [-25, 25], "angle": 60 } },
+        { "Straight": { "length": 10 } },
+        { "Arc": { "offset": [-25, 25], "angle": 90 } }
+      ],
+      "color": [0, 0, 0]
+    },
+    "S22": {
+      "geometries": [
+        { "Straight": { "length": 70 } },
+        { "Arc": { "offset": [-25, 25], "angle": 90 } }
+      ],
+      "color": [255, 0, 0]
+    },
+    "S23": {
+      "geometries": [{ "Straight": { "length": 50 } }],
+      "color": [0, 0, 255]
+    },
+    "S24": {
+      "geometries": [
+        { "Arc": { "offset": [35, 30], "angle": 120 } },
+        { "Straight": { "length": 50 } }
+      ],
+      "color": [255, 0, 255]
+    },
+    "S25": {
+      "geometries": [
+        { "Straight": { "length": 50 } },
+        { "Arc": { "offset": [-25, 25], "angle": 90 } }
+      ],
+      "color": [255, 0, 0]
+    },
+    "S26": {
+      "geometries": [{ "Straight": { "length": 50 } }],
+      "color": [255, 0, 255]
+    },
+    "S13": {
+      "geometries": [{ "Straight": { "length": 50 } }],
+      "color": [0, 0, 0]
+    }
   }
 }

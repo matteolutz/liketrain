@@ -2,3 +2,7 @@
 resolver = "3"
 members = ["crates/liketrain-ui", "crates/liketrain-core", "crates/liketrain-hardware"]
 exclude = ["crates/liketrain-avr"]
+
+[workspace.dependencies]
+itertools = "0.14.0"
+log = "0.4.29"

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    SectionId, SwitchId, SwitchState, Track, Train, TrainId,
+    SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
 };
 
@@ -223,7 +223,6 @@ impl Controller {
             HardwareEvent::Pong { slave_id, seq } => {
                 println!("received pong from slave {} with seq {}", slave_id, seq)
             }
-            HardwareEvent::DebugMessage { .. } | HardwareEvent::Ack => {} // is handled by underlying implementation
         }
         Ok(())
     }
@@ -252,11 +251,16 @@ impl Controller {
                         self.try_reserve_section(next_section, train_id);
 
                         // set required switches to the next section first
-                        for (switch_id, state) in transition.required_switch_changes() {
+                        for SectionTransitionSwitchChange {
+                            switch_id,
+                            required_state,
+                            ..
+                        } in transition.required_switch_changes()
+                        {
                             let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
                             ctx.exec(HardwareCommand::SetSwitchState {
                                 switch_id: hw_switch_id,
-                                state: state.into(),
+                                state: required_state.into(),
                             })?;
                         }
 
@@ -316,11 +320,16 @@ impl Controller {
                     })?;
 
                     // set required switches to the next section
-                    for (switch_id, state) in transition.required_switch_changes() {
+                    for SectionTransitionSwitchChange {
+                        switch_id,
+                        required_state,
+                        ..
+                    } in transition.required_switch_changes()
+                    {
                         let hw_switch_id: HardwareSwitchId = switch_id.try_into().unwrap();
                         ctx.exec(HardwareCommand::SetSwitchState {
                             switch_id: hw_switch_id,
-                            state: state.into(),
+                            state: required_state.into(),
                         })?;
                     }
 

@@ -1,10 +1,8 @@
 #[cfg(test)]
 mod tests;
 
-mod ext;
 use std::io;
 
-pub use ext::*;
 use liketrain_hardware::serial::SerialInterface;
 
 pub struct SerialportSerialInterface(Box<dyn serialport::SerialPort>);

@@ -1,10 +1,6 @@
-#[cfg(feature = "avr")]
-pub use alloc::string::String;
-
 mod section;
 pub use section::*;
 
-pub mod avr;
 pub mod deser;
 
 pub const HARDWARE_SWITCH_ID_MAX_LEN: usize = 32;
@@ -29,10 +25,4 @@ pub enum HardwareEvent {
         switch_id: HardwareSwitchId,
         state: HardwareSwitchState,
     },
-
-    DebugMessage {
-        message: String,
-    },
-
-    Ack,
 }

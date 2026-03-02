@@ -1,58 +1,91 @@
-use arduino_hal::{Usart, hal::Atmega, usart::UsartOps};
 use embedded_hal::digital::OutputPin;
-
-use crate::serial::UsartExt;
+use liketrain_hardware::serial::{SerialError, SerialInterface};
 
 #[derive(Debug)]
-pub enum Rs485Error {
+pub enum Rs485Error<E: core::fmt::Debug> {
     PinError,
-    SerialError,
+    SerialError(SerialError<E>),
 }
 
-pub struct Rs485<'a, R, U> {
+impl<E> From<SerialError<E>> for Rs485Error<E>
+where
+    E: core::fmt::Debug,
+{
+    fn from(value: SerialError<E>) -> Self {
+        Self::SerialError(value)
+    }
+}
+
+pub struct Rs485<'a, R, E: core::fmt::Debug> {
     re_de_pin: R,
-    serial: &'a mut U,
+    serial: &'a mut dyn SerialInterface<Error = E>,
 }
 
-impl<'a, R, USART, RX, TX> Rs485<'a, R, Usart<USART, RX, TX>>
+impl<'a, R, E> Rs485<'a, R, E>
 where
     R: OutputPin,
-    USART: UsartOps<Atmega, RX, TX>,
+    E: core::fmt::Debug,
 {
-    pub fn new(re_de_pin: R, serial: &'a mut Usart<USART, RX, TX>) -> Self {
+    pub fn new(re_de_pin: R, serial: &'a mut dyn SerialInterface<Error = E>) -> Self {
         Rs485 { re_de_pin, serial }
     }
 
-    fn transmit(&mut self) -> Result<(), Rs485Error> {
+    fn transmit(&mut self) -> Result<(), Rs485Error<E>> {
         self.re_de_pin.set_high().map_err(|_| Rs485Error::PinError)
     }
 
-    fn receive(&mut self) -> Result<(), Rs485Error> {
+    fn receive(&mut self) -> Result<(), Rs485Error<E>> {
         self.re_de_pin.set_low().map_err(|_| Rs485Error::PinError)
     }
 }
 
-impl<'a, R, USART, RX, TX> UsartExt for Rs485<'a, R, Usart<USART, RX, TX>>
+impl<'a, R, E> SerialInterface for Rs485<'a, R, E>
 where
     R: OutputPin,
-    USART: UsartOps<Atmega, RX, TX>,
+    E: core::fmt::Debug,
 {
-    type Error = Rs485Error;
+    type Error = Rs485Error<E>;
 
-    fn write_deser<T: liketrain_hardware::deser::Deser>(
+    fn write_byte(
         &mut self,
-        data: &T,
-    ) -> Result<(), Self::Error> {
+        byte: u8,
+    ) -> Result<(), liketrain_hardware::serial::SerialError<Self::Error>> {
         self.transmit()?;
         self.serial
-            .write_deser(data)
-            .map_err(|_| Rs485Error::SerialError)
+            .write_byte(byte)
+            .map_err(Rs485Error::SerialError)?;
+        Ok(())
     }
 
-    fn try_read_deser_from_stream<T: liketrain_hardware::deser::Deser>(
-        stream: crate::serial::UartStream,
-    ) -> Result<Option<T>, Self::Error> {
-        Usart::<USART, RX, TX>::try_read_deser_from_stream(stream)
-            .map_err(|_| Rs485Error::SerialError)
+    fn write_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<usize, liketrain_hardware::serial::SerialError<Self::Error>> {
+        self.transmit()?;
+        let bytes_read = self
+            .serial
+            .write_bytes(bytes)
+            .map_err(|e| Rs485Error::SerialError(e))?;
+        Ok(bytes_read)
+    }
+
+    fn read_max_bytes(
+        &mut self,
+        bytes: &mut [u8],
+    ) -> Result<usize, liketrain_hardware::serial::SerialError<Self::Error>> {
+        self.receive()?;
+        let bytes_read = self
+            .serial
+            .read_max_bytes(bytes)
+            .map_err(|e| Rs485Error::SerialError(e))?;
+        Ok(bytes_read)
+    }
+
+    fn flush(&mut self) -> Result<(), liketrain_hardware::serial::SerialError<Self::Error>> {
+        self.transmit()?;
+        self.serial
+            .flush()
+            .map_err(|e| Rs485Error::SerialError(e))?;
+        Ok(())
     }
 }

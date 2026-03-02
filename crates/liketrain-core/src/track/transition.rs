@@ -23,6 +23,12 @@ pub enum SectionTransition {
     },
 }
 
+pub struct SectionTransitionSwitchChange {
+    pub switch_id: SwitchId,
+    pub is_switch_back: bool,
+    pub required_state: SwitchState,
+}
+
 impl SectionTransition {
     pub fn direct(id: SectionId, section_end: SectionEnd) -> Self {
         Self::Direct {
@@ -63,14 +69,18 @@ impl SectionTransition {
         }
     }
 
-    fn _required_switch_changes(&self, changes: &mut Vec<(SwitchId, SwitchState)>) {
+    fn _required_switch_changes(&self, changes: &mut Vec<SectionTransitionSwitchChange>) {
         match self {
             Self::Switch {
                 switch_id,
                 state,
                 to,
             } => {
-                changes.push((switch_id.clone(), *state));
+                changes.push(SectionTransitionSwitchChange {
+                    switch_id: switch_id.clone(),
+                    is_switch_back: false,
+                    required_state: *state,
+                });
                 to._required_switch_changes(changes);
             }
             Self::SwitchBack {
@@ -78,14 +88,18 @@ impl SectionTransition {
                 state,
                 to,
             } => {
-                changes.push((switch_id.clone(), *state));
+                changes.push(SectionTransitionSwitchChange {
+                    switch_id: switch_id.clone(),
+                    is_switch_back: true,
+                    required_state: *state,
+                });
                 to._required_switch_changes(changes);
             }
             _ => {}
         }
     }
 
-    pub fn required_switch_changes(&self) -> Vec<(SwitchId, SwitchState)> {
+    pub fn required_switch_changes(&self) -> Vec<SectionTransitionSwitchChange> {
         let mut changes = Vec::new();
         self._required_switch_changes(&mut changes);
         changes
