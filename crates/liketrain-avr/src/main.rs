@@ -23,7 +23,7 @@ use crate::{
     command::{CommandExecutionContext, CommandExt},
     mode::{LiketrainMode, SlaveId},
     rs485::Rs485,
-    serial::UsartInterface,
+    serial::{AvrDeserSerialExt, AvrTimeoutExt, UsartInterface},
     slave::{SlaveCommand, SlaveResponse},
     track::{Section, SectionDelegate, SectionPowerRelais},
 };
@@ -215,13 +215,17 @@ fn main() -> ! {
                 });
 
                 // block for the first response, this should be the event count
-                let Ok(SlaveResponse::EventCount { count: event_count }) = rs485.wait_for() else {
+                let Ok(SlaveResponse::EventCount { count: event_count }) =
+                    rs485.wait_for_timeout(millis.timeout(1000))
+                else {
                     continue;
                 };
 
                 // recieve as many events as the slave said it had
                 for _ in 0..event_count {
-                    let Ok(SlaveResponse::Event(event)) = rs485.wait_for() else {
+                    let Ok(SlaveResponse::Event(event)) =
+                        rs485.wait_for_timeout(millis.timeout(1000))
+                    else {
                         break;
                     };
 

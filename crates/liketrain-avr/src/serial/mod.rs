@@ -3,6 +3,9 @@ use core::ops::{Deref, DerefMut};
 use arduino_hal::{Usart, hal::Atmega, prelude::_embedded_hal_serial_Read, usart::UsartOps};
 use liketrain_hardware::serial::SerialInterface;
 
+mod deser;
+pub use deser::*;
+
 pub struct UsartInterface<USART: UsartOps<Atmega, RX, TX>, RX, TX>(Usart<USART, RX, TX>);
 
 impl<USART: UsartOps<Atmega, RX, TX>, RX, TX> Deref for UsartInterface<USART, RX, TX> {

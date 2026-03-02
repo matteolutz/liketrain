@@ -37,10 +37,6 @@ pub trait DeserSerialExt<E: core::fmt::Debug> {
     /// Read a [`Deser`] value from the serial interface.
     /// Will return `Ok(None)` if no value is available.
     fn read<T: Deser>(&mut self) -> Result<Option<T>, DeserSerialExtError<T::Error, E>>;
-
-    /// Read a [`Deser`] value from the serial interface.
-    /// Will block until a value is available.
-    fn wait_for<T: Deser>(&mut self) -> Result<T, DeserSerialExtError<T::Error, E>>;
 }
 
 impl<'a, E> DeserSerialExt<E> for Serial<'a, E>
@@ -113,16 +109,6 @@ where
             self.stream_mut().drain(0..(5 + size + 1));
 
             return Ok(Some(data));
-        }
-    }
-
-    fn wait_for<T: Deser>(&mut self) -> Result<T, DeserSerialExtError<T::Error, E>> {
-        loop {
-            self.update()?;
-
-            if let Some(value) = self.read()? {
-                return Ok(value);
-            }
         }
     }
 }

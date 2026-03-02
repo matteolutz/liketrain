@@ -35,6 +35,7 @@ impl core::ops::DerefMut for SerialStream {
 #[derive(Debug)]
 pub enum SerialError<E: core::fmt::Debug> {
     FailedToWrite,
+    Timeout,
 
     Error(E),
 }
