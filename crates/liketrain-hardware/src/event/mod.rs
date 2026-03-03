@@ -19,6 +19,11 @@ pub enum HardwareEvent {
         slave_id: u32,
         seq: u32,
     },
+
+    Slaves {
+        n_slaves: u32,
+    },
+
     SectionEvent(SectionEvent),
 
     SwitchStateChanged {

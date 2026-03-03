@@ -5,7 +5,7 @@ use alloc::{
 use liketrain_hardware::{command::HardwareCommand, event::HardwareEvent};
 
 use crate::{
-    mode::LiketrainMode,
+    mode::{LiketrainMode, Slaves},
     track::{SectionDelegate, SectionError},
 };
 
@@ -19,6 +19,7 @@ pub struct CommandExecutionContext<'a> {
     pub event_list: &'a mut Vec<HardwareEvent>,
     pub sections: &'a mut [&'a mut dyn SectionDelegate],
     pub debug_messages: &'a mut Vec<String>,
+    pub slaves: Option<Slaves>,
 }
 
 impl<'a> CommandExecutionContext<'a> {
@@ -62,6 +63,14 @@ impl CommandExt for HardwareCommand {
                     .set_power(power)
                     .map_err(CommandExecutionError::SectionError)?;
 
+                Ok(true)
+            }
+            Self::GetSlaves if let Some(slaves) = ctx.slaves => {
+                // ctx.slaves will only be set if we are the master
+
+                ctx.event_list.push(HardwareEvent::Slaves {
+                    n_slaves: slaves.n_slaves(),
+                });
                 Ok(true)
             }
             _ => Ok(false),

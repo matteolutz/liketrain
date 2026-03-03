@@ -19,13 +19,14 @@ use panic_halt as _;
 
 #[cfg(feature = "sim")]
 use crate::sim::SimTrain;
+
 use crate::{
     command::{CommandExecutionContext, CommandExt},
-    mode::{LiketrainMode, SlaveId},
+    mode::{LiketrainMode, SlaveId, Slaves},
     rs485::Rs485,
     serial::{AvrDeserSerialExt, AvrTimeoutExt, UsartInterface},
     slave::{SlaveCommand, SlaveResponse},
-    track::{Section, SectionDelegate, SectionPowerRelais},
+    track::{Section, SectionDelegate, SectionPins},
 };
 
 mod command;
@@ -33,6 +34,7 @@ mod mode;
 mod rs485;
 mod serial;
 mod slave;
+mod throttle;
 mod track;
 
 #[cfg(feature = "sim")]
@@ -81,43 +83,35 @@ fn main() -> ! {
 
     let mut builtin_in = pins.d13.into_output();
 
-    let mut section_24 = Section::new(
-        24,
-        SectionPowerRelais::new(
-            pins.d4.into_output(),
-            pins.d5.into_output(),
-            pins.d6.into_output(),
-            pins.d7.into_output(),
-        )
-        .unwrap(),
-        pins.d8,
-    );
+    let section_pins_1 = SectionPins {
+        power_a: pins.d4.into_output(),
+        power_b: pins.d5.into_output(),
+        power_c: pins.d6.into_output(),
+        power_d: pins.d7.into_output(),
+        train_detection: pins.d8,
+    };
 
-    let mut section_22 = Section::new(
-        22,
-        SectionPowerRelais::new(
-            pins.d9.into_output(),
-            pins.d10.into_output(),
-            pins.d11.into_output(),
-            pins.d12.into_output(),
-        )
-        .unwrap(),
-        pins.d26,
-    );
+    let section_pins_2 = SectionPins {
+        power_a: pins.d9.into_output(),
+        power_b: pins.d10.into_output(),
+        power_c: pins.d11.into_output(),
+        power_d: pins.d12.into_output(),
+        train_detection: pins.d26,
+    };
 
-    let mut section_21 = Section::new(
-        21,
-        SectionPowerRelais::new(
-            pins.d21.into_output(),
-            pins.d22.into_output(),
-            pins.d23.into_output(),
-            pins.d24.into_output(),
-        )
-        .unwrap(),
-        pins.d25,
-    );
+    let section_pins_3 = SectionPins {
+        power_a: pins.d21.into_output(),
+        power_b: pins.d22.into_output(),
+        power_c: pins.d23.into_output(),
+        power_d: pins.d24.into_output(),
+        train_detection: pins.d25,
+    };
 
-    let slave_ids: [SlaveId; 0] = [];
+    let mut section_24 = Section::from_pins(24, section_pins_1);
+    let mut section_22 = Section::from_pins(22, section_pins_2);
+    let mut section_21 = Section::from_pins(21, section_pins_3);
+
+    let slaves = Slaves::new(1);
     let mut sections: [&mut dyn SectionDelegate; 3] =
         [&mut section_21, &mut section_22, &mut section_24];
 
@@ -131,8 +125,8 @@ fn main() -> ! {
 
     let serial_one = Usart::new(dp.USART1, pins.d19, pins.d18.into_output(), 115200.into());
     let mut serial_one_interface = UsartInterface::from(serial_one);
-    let mut rs485 = Rs485::new(pins.d2.into_output(), &mut serial_one_interface);
-    let mut rs485 = Serial::new(&mut rs485);
+    // let mut rs485 = Rs485::new(pins.d2.into_output(), &mut serial_one_interface);
+    let mut rs485 = Serial::new(&mut serial_one_interface); // just for testing
 
     let mut event_list = Vec::new();
     let mut slave_commands = Vec::new();
@@ -143,7 +137,11 @@ fn main() -> ! {
         event_list: &mut event_list,
         sections: &mut sections,
         debug_messages: &mut debug_messages,
+        slaves: MODE.is_master().then_some(slaves),
     };
+
+    // this is used to delay the ack response until the end of the loop
+    let mut send_ack = false;
 
     loop {
         // receive incoming commands, if slave, send events when requested
@@ -161,7 +159,8 @@ fn main() -> ! {
                         slave_commands.push(command);
                     }
 
-                    let _ = usb_serial.write(&HardwareResponse::Ack);
+                    // send ack after the rest of the loop has finished
+                    send_ack = true;
                 }
             }
             LiketrainMode::Slave { slave_id } => {
@@ -174,7 +173,7 @@ fn main() -> ! {
                         }
                         SlaveCommand::EventPoll {
                             slave_id: poll_slave_id,
-                        } if slave_id == poll_slave_id => {
+                        } if slave_id.as_u32() == poll_slave_id => {
                             let num_events = execution_ctx.event_list.len();
 
                             let _ = rs485.write(&SlaveResponse::EventCount {
@@ -209,14 +208,12 @@ fn main() -> ! {
 
         // poll slaves
         if MODE.is_master() {
-            for slave_id in &slave_ids {
-                let _ = rs485.write(&SlaveCommand::EventPoll {
-                    slave_id: *slave_id,
-                });
+            for slave_id in slaves {
+                let _ = rs485.write(&SlaveCommand::EventPoll { slave_id });
 
                 // block for the first response, this should be the event count
                 let Ok(SlaveResponse::EventCount { count: event_count }) =
-                    rs485.wait_for_timeout(millis.timeout(1000))
+                    rs485.wait_for_timeout(millis.timeout(10))
                 else {
                     continue;
                 };
@@ -224,7 +221,7 @@ fn main() -> ! {
                 // recieve as many events as the slave said it had
                 for _ in 0..event_count {
                     let Ok(SlaveResponse::Event(event)) =
-                        rs485.wait_for_timeout(millis.timeout(1000))
+                        rs485.wait_for_timeout(millis.timeout(10))
                     else {
                         break;
                     };
@@ -243,6 +240,11 @@ fn main() -> ! {
 
                 for message in execution_ctx.debug_messages.drain(..) {
                     let _ = usb_serial.write(&HardwareResponse::DebugMessage { message });
+                }
+
+                if send_ack {
+                    let _ = usb_serial.write(&HardwareResponse::Ack);
+                    send_ack = false;
                 }
             }
             LiketrainMode::Slave { .. } => {

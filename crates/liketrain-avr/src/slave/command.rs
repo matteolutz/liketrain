@@ -8,7 +8,7 @@ use crate::mode::SlaveId;
 
 #[derive(Debug)]
 pub enum SlaveCommand {
-    EventPoll { slave_id: SlaveId },
+    EventPoll { slave_id: u32 },
     Command(HardwareCommand),
 }
 
@@ -54,7 +54,9 @@ impl Deser for SlaveCommand {
                 let slave_id = buffer.parse_u32()?;
                 let slave_id: SlaveId = slave_id.try_into()?;
 
-                Ok(SlaveCommand::EventPoll { slave_id })
+                Ok(SlaveCommand::EventPoll {
+                    slave_id: slave_id.as_u32(),
+                })
             }
             SlaveCommandType::Command => {
                 let command = HardwareCommand::deserialize(buffer.buffer())?;
@@ -72,8 +74,8 @@ impl Deser for SlaveCommand {
                 command.serialize_into(buffer.buffer())?;
                 Ok(())
             }
-            Self::EventPoll { slave_id } => {
-                buffer.write_u32(slave_id.as_u32())?;
+            &Self::EventPoll { slave_id } => {
+                buffer.write_u32(slave_id)?;
                 Ok(())
             }
         }

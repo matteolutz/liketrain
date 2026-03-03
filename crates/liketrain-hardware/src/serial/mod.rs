@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 mod deser;
 pub use deser::*;
 
-const SERIAL_BUFFER_SIZE: usize = 128;
+const SERIAL_BUFFER_SIZE: usize = 256;
 
 pub struct SerialStream(Vec<u8>);
 

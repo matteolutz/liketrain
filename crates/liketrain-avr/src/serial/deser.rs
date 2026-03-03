@@ -11,6 +11,19 @@ where
     pub millis_fn: F,
 }
 
+impl<F> AvrTimeout<F>
+where
+    F: Fn() -> u32,
+{
+    pub fn start(&self) -> u32 {
+        (self.millis_fn)()
+    }
+
+    pub fn is_timeout(&self, start: u32) -> bool {
+        (self.millis_fn)() - start >= self.timeout_ms
+    }
+}
+
 pub trait AvrTimeoutExt: Fn() -> u32 + Sized {
     fn timeout(self, timeout: u32) -> AvrTimeout<Self> {
         AvrTimeout {
@@ -52,12 +65,12 @@ pub trait AvrDeserSerialExt<E: core::fmt::Debug> {
 impl<'a, E: core::fmt::Debug> AvrDeserSerialExt<E> for Serial<'a, E> {
     fn _wait_for_timeout<D: Deser, F>(
         &mut self,
-        millis: Option<AvrTimeout<F>>,
+        timeout: Option<AvrTimeout<F>>,
     ) -> Result<D, DeserSerialExtError<D::Error, E>>
     where
         F: Fn() -> u32,
     {
-        let start = millis.as_ref().map(|m| (m.millis_fn)());
+        let start = timeout.as_ref().map(|t| t.start());
 
         loop {
             self.update()?;
@@ -66,8 +79,8 @@ impl<'a, E: core::fmt::Debug> AvrDeserSerialExt<E> for Serial<'a, E> {
                 return Ok(value);
             }
 
-            if let Some(millis) = millis.as_ref()
-                && (millis.millis_fn)() > start.unwrap() + millis.timeout_ms
+            if let Some(timeout) = timeout.as_ref()
+                && timeout.is_timeout(start.unwrap())
             {
                 return Err(SerialError::Timeout.into());
             }

@@ -7,7 +7,8 @@ use crate::{
 
 deser_variant! {
     HardwareCommandType {
-        Ping = 0x0,
+        Ping = 0x1,
+        GetSlaves = 0x2,
         SetSectionPower = 0x10,
         SetSwitchState = 0x20,
         ResetAll = 0x30,
@@ -22,6 +23,7 @@ impl Deser for HardwareCommand {
     fn payload_size(variant: Self::Variant) -> crate::deser::DeserSize {
         match variant {
             HardwareCommandType::Ping => 8.into(),
+            HardwareCommandType::GetSlaves => 0.into(),
             HardwareCommandType::ResetAll => 0.into(),
             HardwareCommandType::SetSectionPower => {
                 (4 + core::mem::size_of::<HardwareSectionPower>()).into()
@@ -36,6 +38,7 @@ impl Deser for HardwareCommand {
         match self {
             Self::Ping { .. } => HardwareCommandType::Ping,
             Self::ResetAll => HardwareCommandType::ResetAll,
+            Self::GetSlaves => HardwareCommandType::GetSlaves,
             Self::SetSectionPower { .. } => HardwareCommandType::SetSectionPower,
             Self::SetSwitchState { .. } => HardwareCommandType::SetSwitchState,
         }
@@ -52,6 +55,7 @@ impl Deser for HardwareCommand {
                 let seq = buffer.parse_u32()?;
                 Ok(Self::Ping { slave_id, seq })
             }
+            HardwareCommandType::GetSlaves => Ok(Self::GetSlaves),
             HardwareCommandType::ResetAll => Ok(Self::ResetAll),
             HardwareCommandType::SetSectionPower => {
                 let section_id = buffer.parse_u32()?;
@@ -76,6 +80,7 @@ impl Deser for HardwareCommand {
                 buffer.write_u32(seq)?;
                 Ok(())
             }
+            Self::GetSlaves => Ok(()),
             Self::ResetAll => Ok(()),
             &Self::SetSectionPower { section_id, power } => {
                 buffer.write_u32(section_id)?;

@@ -6,9 +6,11 @@ use crate::{
 
 deser_variant! {
     HardwareEventType {
-        Pong = 0x0,
-        SectionEvent = 0x1,
-        SwitchStateChange = 0x2,
+        Pong = 0x1,
+        SectionEvent = 0x2,
+        SwitchStateChange = 0x3,
+
+        Slaves = 0x10
     }
 }
 
@@ -31,6 +33,7 @@ impl Deser for HardwareEvent {
             HardwareEventType::SwitchStateChange => {
                 core::mem::size_of::<HardwareEventSwitchStateChange>().into()
             }
+            HardwareEventType::Slaves => 4.into(),
         }
     }
 
@@ -39,6 +42,7 @@ impl Deser for HardwareEvent {
             Self::SectionEvent { .. } => HardwareEventType::SectionEvent,
             Self::Pong { .. } => HardwareEventType::Pong,
             Self::SwitchStateChanged { .. } => HardwareEventType::SwitchStateChange,
+            Self::Slaves { .. } => HardwareEventType::Slaves,
         }
     }
 
@@ -52,6 +56,10 @@ impl Deser for HardwareEvent {
                 let slave_id = payload.parse_u32()?;
                 let seq = payload.parse_u32()?;
                 Ok(Self::Pong { slave_id, seq })
+            }
+            HardwareEventType::Slaves => {
+                let n_slaves = payload.parse_u32()?;
+                Ok(Self::Slaves { n_slaves })
             }
             HardwareEventType::SectionEvent => {
                 let section_event: SectionEvent = payload.parse()?;
@@ -74,6 +82,10 @@ impl Deser for HardwareEvent {
             &Self::Pong { slave_id, seq } => {
                 buffer.write_u32(slave_id)?;
                 buffer.write_u32(seq)?;
+                Ok(())
+            }
+            &Self::Slaves { n_slaves } => {
+                buffer.write_u32(n_slaves)?;
                 Ok(())
             }
             Self::SectionEvent(event) => {

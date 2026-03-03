@@ -223,6 +223,9 @@ impl Controller {
             HardwareEvent::Pong { slave_id, seq } => {
                 println!("received pong from slave {} with seq {}", slave_id, seq)
             }
+            HardwareEvent::Slaves { n_slaves } => {
+                println!("received slaves event with n_slaves: {}", n_slaves);
+            }
         }
         Ok(())
     }
@@ -385,29 +388,43 @@ impl Controller {
     }
 
     fn init(&mut self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
-        let ping_seq = 1337;
+        log::debug!("getting slaves from master");
+        ctx.exec(HardwareCommand::GetSlaves)?;
 
-        // ping the master
-        log::debug!("sending ping to master");
-        ctx.exec(HardwareCommand::Ping {
-            slave_id: 0,
-            seq: ping_seq,
-        })?;
-
-        if let HardwareEvent::Pong { slave_id, seq } = ctx.event_rx.recv()?
-            && slave_id == 0
-            && seq == ping_seq
-        {
-            log::debug!("received pong from master");
-            // okay, we received the correct pong
-        } else {
+        let HardwareEvent::Slaves { n_slaves } = ctx.event_rx.recv()? else {
             return Err(ControllerError::ExpectedHardwareEvent(
-                HardwareEvent::Pong {
-                    slave_id: 0,
-                    seq: ping_seq,
-                },
+                HardwareEvent::Slaves { n_slaves: 0 },
             ));
         };
+
+        log::debug!("we have {} slaves", n_slaves);
+
+        let ping_seq = 1337;
+
+        // send pings
+        for device_id in 0..=n_slaves {
+            log::debug!("sending ping to device {}", device_id);
+
+            ctx.exec(HardwareCommand::Ping {
+                slave_id: device_id,
+                seq: ping_seq,
+            })?;
+
+            if let HardwareEvent::Pong { slave_id, seq } = ctx.event_rx.recv()?
+                && slave_id == device_id
+                && seq == ping_seq
+            {
+                log::debug!("received pong from device {}", device_id);
+                // okay, we received the correct pong
+            } else {
+                return Err(ControllerError::ExpectedHardwareEvent(
+                    HardwareEvent::Pong {
+                        slave_id: device_id,
+                        seq: ping_seq,
+                    },
+                ));
+            };
+        }
 
         // reset everything
         ctx.exec(HardwareCommand::ResetAll)?;

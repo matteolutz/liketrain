@@ -1,0 +1,268 @@
+#include <Arduino.h>
+
+#include "panic.h"
+
+#include "queue.h"
+#include "deser.h"
+#include "command.h"
+#include "event.h"
+#include "response.h"
+
+#include "slave_command.h"
+#include "slave_response.h"
+
+#include "config.h"
+
+DeserHeapBufferDeserializer deser;
+DeserBufferSerializer<128> ser;
+
+DeserSerial usb_serial(Serial);
+DeserSerial rs485_serial(Serial1);
+
+Queue<LiketrainEvent> events(32);
+Queue<LiketrainCommand> slave_relay(32);
+
+// Whether to send an ACK response to the host after processing the next command.
+// Set to true when a command is received, and set back to false after sending the ACK.
+bool send_ack = false;
+
+// ~~~~~~~~~~~ Master functions ~~~~~~~~~~ //
+#ifdef IS_MASTER
+void read_host_commands();
+void poll_slaves();
+void send_events_to_host();
+void send_ack_to_host();
+#endif
+
+// ~~~~~~~~~~~ Slave functions ~~~~~~~~~~~ //
+#ifndef IS_MASTER
+void read_master_commands();
+#endif
+
+// Handle a received command and return whether it was handled successfully.
+// If false is returned, the master will know to relay the command onto the slave bus
+bool handle_command(LiketrainCommand &cmd);
+
+void setup()
+{
+  panic_init();
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  for (int i = 0; i < 3; i++)
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(100);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(100);
+  }
+
+#ifdef IS_MASTER
+  usb_serial.init();
+#endif
+
+  rs485_serial.init();
+}
+
+void loop()
+{
+#ifdef IS_MASTER
+  read_host_commands();
+#else
+  read_master_commands();
+#endif
+
+#ifdef IS_MASTER
+  poll_slaves();
+#endif
+
+  // TODO: update sections
+
+#ifdef IS_MASTER
+  send_events_to_host();
+#endif
+
+#ifdef IS_MASTER
+  if (send_ack)
+  {
+    send_ack_to_host();
+    send_ack = false;
+  }
+#endif
+}
+
+#ifdef IS_MASTER
+void read_host_commands()
+{
+  usb_serial.update();
+
+  while (usb_serial.read_frame(deser))
+  {
+    LiketrainCommand cmd;
+    cmd.deserialize(deser);
+
+    if (!handle_command(cmd))
+    {
+      slave_relay.enqueue(cmd);
+    }
+
+    send_ack = true;
+  }
+}
+
+void poll_slaves()
+{
+  // send unhandled commands to slaves
+  LiketrainCommand cmd;
+  while (slave_relay.dequeue(cmd))
+  {
+    auto slave_cmd = LiketrainSlaveCommand::command(cmd);
+
+    ser.reset();
+    slave_cmd.serialize(ser);
+
+    rs485_serial.write_frame(ser);
+  }
+
+  for (uint32_t slave_id = 1; slave_id <= SLAVE_COUNT; slave_id++)
+  {
+    auto slave_cmd = LiketrainSlaveCommand::event_poll(slave_id);
+
+    ser.reset();
+    slave_cmd.serialize(ser);
+
+    rs485_serial.write_frame(ser);
+
+    if (!rs485_serial.await_frame(deser, 50))
+    {
+      // timeout
+      continue;
+    }
+
+    LiketrainSlaveResponse slave_response;
+    slave_response.deserialize(deser);
+
+    if (slave_response.type != LiketrainSlaveResponseType::EventCount)
+    {
+      continue;
+    }
+
+    auto event_count = slave_response.data.event_count.event_count;
+
+    // get as many events as the slave has, or until a timeout occurs
+    for (uint32_t i = 0; i < event_count; i++)
+    {
+
+      if (!rs485_serial.await_frame(deser, 50))
+      {
+        // timeout
+        break;
+      }
+
+      LiketrainSlaveResponse slave_event_response;
+      slave_event_response.deserialize(deser);
+      if (slave_event_response.type != LiketrainSlaveResponseType::Event)
+      {
+        break;
+      }
+
+      events.enqueue(*slave_event_response.data.event.event);
+    }
+  }
+}
+
+void send_events_to_host()
+{
+  LiketrainEvent evt;
+  while (events.dequeue(evt))
+  {
+    auto response = LiketrainResponse::event(evt);
+
+    ser.reset();
+    response.serialize(ser);
+
+    usb_serial.write_frame(ser);
+  }
+}
+
+void send_ack_to_host()
+{
+  auto response = LiketrainResponse::ack();
+
+  ser.reset();
+  response.serialize(ser);
+
+  usb_serial.write_frame(ser);
+}
+#endif
+
+#ifndef IS_MASTER
+void read_master_commands()
+{
+  rs485_serial.update();
+
+  while (rs485_serial.read_frame(deser))
+  {
+    LiketrainSlaveCommand cmd;
+    cmd.deserialize(deser);
+
+    switch (cmd.type)
+    {
+    case LiketrainSlaveCommandType::Command:
+      handle_command(*cmd.data.command.command);
+      break;
+    case LiketrainSlaveCommandType::EventPoll:
+      auto response = LiketrainSlaveResponse::event_count(events.size());
+
+      ser.reset();
+      response.serialize(ser);
+
+      rs485_serial.write_frame(ser);
+
+      LiketrainEvent evt;
+      while (events.dequeue(evt))
+      {
+        auto event_response = LiketrainSlaveResponse::event(evt);
+        ser.reset();
+        event_response.serialize(ser);
+
+        rs485_serial.write_frame(ser);
+      }
+
+      break;
+    }
+  }
+}
+#endif
+
+bool handle_command(LiketrainCommand &cmd)
+{
+  switch (cmd.type)
+  {
+  case LiketrainCommandType::Ping:
+  {
+    if (slave_id.get() != cmd.data.ping.slave_id)
+    {
+      return false;
+    }
+
+    auto pong_event = LiketrainEvent::pong(cmd.data.ping.slave_id, cmd.data.ping.seq);
+    events.enqueue(pong_event);
+
+    return true;
+  }
+  case LiketrainCommandType::GetSlaves:
+  {
+    if (!slave_id.is_master())
+    {
+      return false;
+    }
+
+    auto slave_event = LiketrainEvent::slaves(SLAVE_COUNT);
+    events.enqueue(slave_event);
+
+    return true;
+  }
+  }
+
+  return false;
+}

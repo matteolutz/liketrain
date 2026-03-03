@@ -11,7 +11,7 @@ pub struct SerialFlowController {
 }
 
 impl SerialFlowController {
-    const ACK_TIMEOUT: Duration = Duration::from_millis(500);
+    const ACK_TIMEOUT: Duration = Duration::from_millis(2000);
 
     pub fn new() -> Self {
         SerialFlowController {
