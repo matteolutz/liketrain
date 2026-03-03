@@ -211,6 +211,12 @@ void read_master_commands()
       handle_command(*cmd.data.command.command);
       break;
     case LiketrainSlaveCommandType::EventPoll:
+      if (slave_id.get() != cmd.data.event_poll.slave_id)
+      {
+        // not for me
+        break;
+      }
+
       auto response = LiketrainSlaveResponse::event_count(events.size());
 
       ser.reset();
