@@ -3,7 +3,7 @@
 
 #include "slave.h"
 
-// #define SLAVE_ID 1
+#define SLAVE_ID 1
 #define SLAVE_COUNT 1
 
 #ifdef SLAVE_ID

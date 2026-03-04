@@ -17,7 +17,9 @@ DeserHeapBufferDeserializer deser;
 DeserBufferSerializer<128> ser;
 
 DeserSerial usb_serial(Serial);
-DeserSerial rs485_serial(Serial1);
+
+RS485 rs485(Serial1, 52, 53);
+DeserSerial rs485_serial(rs485);
 
 Queue<LiketrainEvent> events(32);
 Queue<LiketrainCommand> slave_relay(32);

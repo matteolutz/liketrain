@@ -8,12 +8,22 @@ DeserSerial::DeserSerial(HardwareSerial &serial)
 {
 }
 
+DeserSerial::DeserSerial(RS485 &rs485)
+    : rs485(&rs485),
+      impl(DeserSerialSerialImplementation::RS485),
+      rx_queue(rx_queue_buffer, DESER_SERIAL_QUEUE_SIZE)
+{
+}
+
 void DeserSerial::init()
 {
     switch (impl)
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         hw_serial->begin(DESER_SERIAL_BAUD);
+        break;
+    case DeserSerialSerialImplementation::RS485:
+        rs485->init(DESER_SERIAL_BAUD);
         break;
     }
 
@@ -30,6 +40,8 @@ int DeserSerial::serial_available()
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         return hw_serial->available();
+    case DeserSerialSerialImplementation::RS485:
+        return rs485->available();
     }
 }
 
@@ -39,6 +51,8 @@ int DeserSerial::serial_read_byte()
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         return hw_serial->read();
+    case DeserSerialSerialImplementation::RS485:
+        return rs485->read();
     }
 }
 
@@ -48,6 +62,8 @@ size_t DeserSerial::serial_read_bytes(uint8_t *buffer, size_t max_size)
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         return hw_serial->readBytes(buffer, max_size);
+    case DeserSerialSerialImplementation::RS485:
+        return rs485->readBytes(buffer, max_size);
     }
 }
 
@@ -57,6 +73,8 @@ size_t DeserSerial::serial_write_bytes(const uint8_t *buffer, size_t size)
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         return hw_serial->write(buffer, size);
+    case DeserSerialSerialImplementation::RS485:
+        return rs485->write(buffer, size);
     }
 }
 
@@ -66,6 +84,8 @@ size_t DeserSerial::serial_write_byte(uint8_t byte)
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         return hw_serial->write(byte);
+    case DeserSerialSerialImplementation::RS485:
+        return rs485->write(byte);
     }
 }
 
@@ -75,6 +95,9 @@ void DeserSerial::serial_flush()
     {
     case DeserSerialSerialImplementation::HardwareSerial:
         hw_serial->flush();
+        break;
+    case DeserSerialSerialImplementation::RS485:
+        rs485->flush();
         break;
     }
 }

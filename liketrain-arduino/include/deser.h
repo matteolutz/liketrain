@@ -6,6 +6,8 @@
 #include "queue.h"
 #include "utils.h"
 
+#include "RS485.h"
+
 #define DESER_SERIAL_BAUD 115200
 
 #define DESER_SERIAL_BUFFER_SIZE 128
@@ -148,12 +150,16 @@ public:
 enum class DeserSerialSerialImplementation
 {
     HardwareSerial,
+    RS485
 };
 
 class DeserSerial
 {
 private:
+    // TODO: maybe jsut use a Stream* instead of having separate pointers and an enum for the implementation type?
     HardwareSerial *hw_serial = nullptr;
+    RS485 *rs485 = nullptr;
+
     DeserSerialSerialImplementation impl;
 
     uint8_t rx_buffer[DESER_SERIAL_BUFFER_SIZE] = {};
@@ -177,6 +183,7 @@ private:
 
 public:
     DeserSerial(HardwareSerial &serial);
+    DeserSerial(RS485 &rs485);
 
     void init();
     void update();
