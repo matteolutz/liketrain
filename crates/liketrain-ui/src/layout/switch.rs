@@ -28,6 +28,13 @@ impl<T> SwitchResolutionState<T> {
         matches!(self, SwitchResolutionState::Unresolvable)
     }
 
+    pub fn ok(&self) -> Option<&T> {
+        match self {
+            SwitchResolutionState::Resolved(t) => Some(t),
+            _ => None,
+        }
+    }
+
     pub fn map_resolved<U>(
         self,
         f: impl FnOnce(T) -> SwitchResolutionState<U>,
@@ -54,6 +61,10 @@ pub struct SwitchResolution {
 
     to_left: SwitchResolutionState<Point<Pixels>>,
     to_right: SwitchResolutionState<Point<Pixels>>,
+
+    /// The direction from the from point to the center point.
+    /// We use this, to draw the switch as a continuation from the section it's coming from
+    from_to_center_direction: SwitchResolutionState<Point<Pixels>>,
 }
 
 impl SwitchResolution {
@@ -73,6 +84,22 @@ impl SwitchResolution {
             SwitchResolutionEnd::From => &mut self.from,
             SwitchResolutionEnd::ToLeft => &mut self.to_left,
             SwitchResolutionEnd::ToRight => &mut self.to_right,
+        }
+    }
+
+    /// Get the center point of this switch resolution.
+    /// This only works if, the `from` and one of the `to` ends are resolved.
+    pub fn center_point(&self) -> Option<Point<Pixels>> {
+        let from = self.from.ok().copied()?;
+
+        if let Some((to_left, to_right)) =
+            self.to_left.ok().copied().zip(self.to_right.ok().copied())
+        {
+            let to_center = (to_left + to_right) / 2.0;
+            Some((from + to_center) / 2.0)
+        } else {
+            let to = self.to_left.ok().or(self.to_right.ok()).copied()?;
+            Some((from + to) / 2.0)
         }
     }
 }
@@ -227,10 +254,16 @@ impl Layout {
                                 },
                             );
 
+                            // assign the position to both switches
                             *switch_resolutions
                                 .get_mut(&switch_id)
                                 .unwrap()
                                 .get_mut(resolution_end) = new_resolution;
+
+                            *switch_resolutions
+                                .get_mut(other_switch_id)
+                                .unwrap()
+                                .get_mut(other_connection_end) = new_resolution;
                         } else {
                             // we don't have a resolution, so the other switch wasn't visited yet
                             // just push ourselves onto the queue again to resolve later

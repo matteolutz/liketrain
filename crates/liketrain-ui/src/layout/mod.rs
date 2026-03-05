@@ -1,19 +1,21 @@
 use std::{collections::HashMap, f32, rc::Rc};
 
 use gpui::{
-    Bounds, IntoElement, PathBuilder, Pixels, Point, RenderOnce, Styled, Window, canvas, fill,
-    point, px, size,
+    Bounds, Context, InteractiveElement, MouseDownEvent, MouseMoveEvent, ParentElement,
+    PathBuilder, Pixels, Point, Render, ScrollWheelEvent, Styled, Window, canvas, div, point, px,
 };
 use liketrain_core::{SectionId, SwitchId, Track};
 use serde::{Deserialize, Serialize, de::Visitor};
-use strum::IntoEnumIterator;
 use vek::Vec2;
 
-use crate::layout::{
-    camera::LayoutCamera,
-    color::LayoutColor,
-    switch::{SwitchResolution, SwitchResolutionEnd, SwitchResolutionState},
-    vec::Vec2Ext,
+use crate::{
+    app_ext::GpuiContextExtension,
+    layout::{
+        camera::LayoutCamera,
+        color::LayoutColor,
+        switch::{SwitchResolution, SwitchResolutionEnd},
+        vec::Vec2Ext,
+    },
 };
 
 mod camera;
@@ -90,7 +92,12 @@ pub struct LayoutSectionGeometry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LayoutSectionGeometryType {
     Straight,
-    Arc { angle: f32 },
+    Arc {
+        angle: f32,
+
+        #[serde(default)]
+        sweep: Option<bool>,
+    },
 }
 
 #[derive(Clone)]
@@ -161,7 +168,7 @@ impl LayoutSectionGeometry {
                 let path = path_builder.build().unwrap();
                 window.paint_path(path, gpui_color);
             }
-            LayoutSectionGeometryType::Arc { angle } => {
+            LayoutSectionGeometryType::Arc { angle, sweep } => {
                 let mut path_builder = PathBuilder::stroke(px(stroke_width));
                 path_builder.move_to(from);
 
@@ -180,7 +187,7 @@ impl LayoutSectionGeometry {
                     point(px(r), px(r)),
                     px(0.0),
                     false,
-                    actual_angle > f32::consts::PI,
+                    sweep.unwrap_or(angle > f32::consts::PI),
                     to,
                 );
 
@@ -191,10 +198,26 @@ impl LayoutSectionGeometry {
     }
 }
 
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
+enum LayoutSectionEnd {
+    #[default]
+    Default,
+
+    Dead,
+
+    Arrow,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutSection {
     from: Point<Pixels>,
     geometries: Vec<LayoutSectionGeometry>,
+
+    #[serde(default)]
+    from_end: LayoutSectionEnd,
+
+    #[serde(default)]
+    to_end: LayoutSectionEnd,
 
     color: LayoutColor,
 }
@@ -217,53 +240,60 @@ pub struct ResolvedLayout {
 }
 
 impl ResolvedLayout {
-    fn render(
-        &self,
-        _track: &Track,
-        config: LayoutRenderConfig,
-        bounds: Bounds<Pixels>,
-        window: &mut Window,
-    ) {
-        let camera = LayoutCamera::new(bounds)
-            .with_zoom(config.zoom)
-            .with_center(config.center);
+    fn render_switch(&self, switch: &SwitchResolution, camera: &LayoutCamera, window: &mut Window) {
+        if let Some(center_point) = switch.center_point() {
+            let points = [
+                switch.get(SwitchResolutionEnd::From).ok().copied(),
+                switch.get(SwitchResolutionEnd::ToLeft).ok().copied(),
+                switch.get(SwitchResolutionEnd::ToRight).ok().copied(),
+            ];
 
+            for p in points {
+                let Some(p) = p else {
+                    continue;
+                };
+
+                let mut path_builder = PathBuilder::stroke(px(camera.scale(SECTION_STROKE_WIDTH)));
+                path_builder.move_to(camera.project(center_point));
+                path_builder.line_to(camera.project(p));
+
+                let path = path_builder.build().unwrap();
+                window.paint_path(path, gpui::green());
+            }
+        } else {
+            // TODO
+        }
+    }
+
+    fn render_canvas(&self, _track: &Track, camera: &LayoutCamera, window: &mut Window) {
         // draw sections
         for (_, layout_section) in self.layout.sections.iter() {
             layout_section
                 .geometries
                 .iter()
                 .fold(layout_section.from, |from, geo| {
-                    geo.render(from, layout_section.color, &camera, window);
+                    geo.render(from, layout_section.color, camera, window);
                     geo.to
                 });
         }
 
         // draw switches
         for (_, resolution) in self.switch_resolutions.iter() {
-            for end in SwitchResolutionEnd::iter() {
-                let SwitchResolutionState::Resolved(point) = resolution.get(end) else {
-                    continue;
-                };
-
-                let point = camera.project(*point);
-                let size = camera.scale_size(size(px(2.0), px(2.0)));
-
-                window.paint_quad(fill(Bounds::centered_at(point, size), gpui::green()));
-            }
+            self.render_switch(resolution, camera, window);
         }
     }
 
-    pub fn renderer(&self, track: &Rc<Track>, config: LayoutRenderConfig) -> LayoutRenderer {
+    pub fn renderer(&self, track: &Rc<Track>, _cx: &mut Context<LayoutRenderer>) -> LayoutRenderer {
         LayoutRenderer {
             layout: self.clone(),
             track: track.clone(),
-            config,
+            camera: LayoutCamera::new(Bounds::default()),
+            last_mouse_pos: None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayoutRenderConfig {
     /// The zoom level to render at
     pub zoom: f32,
@@ -272,22 +302,113 @@ pub struct LayoutRenderConfig {
     pub center: Point<Pixels>,
 }
 
-#[derive(IntoElement)]
 pub struct LayoutRenderer {
     layout: ResolvedLayout,
     track: Rc<Track>,
 
-    config: LayoutRenderConfig,
+    last_mouse_pos: Option<Point<Pixels>>,
+
+    camera: LayoutCamera,
 }
 
-impl RenderOnce for LayoutRenderer {
-    fn render(self, _: &mut gpui::Window, _: &mut gpui::App) -> impl gpui::IntoElement {
-        canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
-                self.layout.render(&self.track, self.config, bounds, window);
-            },
-        )
-        .size_full()
+impl Render for LayoutRenderer {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        div()
+            .size_full()
+            .relative()
+            .on_scroll_wheel(cx.listener(|this, evt: &ScrollWheelEvent, _, cx| {
+                let delta_y = evt.delta.pixel_delta(px(1.0)).y.as_f32();
+                this.camera.zoom = (this.camera.zoom + (delta_y / 4.0)).max(0.0);
+                cx.notify();
+            }))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, evt: &MouseDownEvent, _, cx| {
+                    this.last_mouse_pos = Some(evt.position);
+                    cx.notify();
+                }),
+            )
+            .on_mouse_up(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.last_mouse_pos = None;
+                    cx.notify();
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, evt: &MouseMoveEvent, _, cx| {
+                let Some(last_mouse_pos) = this.last_mouse_pos.as_mut() else {
+                    return;
+                };
+
+                let delta = evt.position - *last_mouse_pos;
+                *last_mouse_pos = evt.position;
+
+                this.camera.position -= delta / this.camera.zoom;
+
+                cx.notify();
+            }))
+            .child(
+                canvas(
+                    cx.prepaint_canvas(|this, bounds, _, cx| {
+                        this.camera.screen_bounds = bounds;
+                        cx.notify();
+                    }),
+                    cx.paint_canvas(|this, _, _, window, _| {
+                        this.layout.render_canvas(&this.track, &this.camera, window);
+                    }),
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .bg(gpui::black())
+                .cursor_crosshair()
+                .size_full(),
+            )
+            .child(
+                div().absolute().top_0().left_0().size_full().children(
+                    self.layout
+                        .switch_resolutions
+                        .iter()
+                        .filter_map(|(id, switch)| switch.center_point().map(|cp| (id, switch, cp)))
+                        .map(|(switch_id, _, cp)| {
+                            /*
+                            let from_point =
+                                switch.get(SwitchResolutionEnd::From).ok().copied().unwrap(); // safe because center_point is derived from from/to points
+
+                            let normal_vec = Vec2::from_point(cp - from_point)
+                                .normalized()
+                                .rotated_z(f32::consts::FRAC_PI_2)
+                                .normalized();
+
+                            let offset = normal_vec * 2.0;
+
+                            let point = self.camera.project(cp + offset.to_point());
+                            */
+
+                            let point = self.camera.project(cp);
+
+                            let container_size = self.camera.scale(px(3.0));
+                            let container_rounding = self.camera.scale(px(1.0));
+                            let text_size = self.camera.scale(px(2.0));
+
+                            div()
+                                .flex()
+                                .justify_center()
+                                .items_center()
+                                .size(container_size)
+                                .bg(gpui::white())
+                                .rounded(container_rounding)
+                                .absolute()
+                                .text_size(text_size)
+                                .top(point.y)
+                                .left(point.x)
+                                .child(switch_id.to_string())
+                        }),
+                ),
+            )
     }
 }

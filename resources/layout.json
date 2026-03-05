@@ -9,7 +9,7 @@
         { "geo_type": { "Arc": { "angle": 90 } }, "to": { "x": 90, "y": 30 } },
         { "geo_type": "Straight", "to": { "x": 90, "y": 5 } }
       ],
-      "color": [0, 0, 0]
+      "color": [255, 255, 255]
     },
     "S22": {
       "from": { "x": 90, "y": 0 },
@@ -21,27 +21,73 @@
         }
       ],
       "color": [255, 0, 0]
-    }
-  },
-  "parkinglot": {
-    "S22": {
-      "geometries": [
-        { "Straight": { "length": 70 } },
-        { "Arc": { "offset": [-25, 25], "angle": 90 } }
-      ],
-      "color": [255, 0, 0]
     },
     "S23": {
-      "geometries": [{ "Straight": { "length": 50 } }],
+      "from": { "x": 65, "y": -55 },
+      "geometries": [{ "geo_type": "Straight", "to": { "x": 25, "y": -55 } }],
       "color": [0, 0, 255]
     },
     "S24": {
+      "from": { "x": 0, "y": -10 },
       "geometries": [
-        { "Arc": { "offset": [35, 30], "angle": 120 } },
-        { "Straight": { "length": 50 } }
+        {
+          "geo_type": { "Arc": { "angle": 90, "sweep": true } },
+          "to": { "x": 30, "y": -50 }
+        },
+        { "geo_type": "Straight", "to": { "x": 60, "y": -50 } },
+        { "geo_type": "Straight", "to": { "x": 65, "y": -52 } }
       ],
       "color": [255, 0, 255]
     },
+    "S25": {
+      "from": { "x": 20, "y": -55 },
+      "geometries": [
+        { "geo_type": "Straight", "to": { "x": -20, "y": -55 } },
+        {
+          "geo_type": { "Arc": { "angle": 60 } },
+          "to": { "x": -45, "y": -41 }
+        }
+      ],
+      "color": [255, 0, 0]
+    },
+    "S26": {
+      "from": { "x": 22, "y": -51 },
+      "geometries": [{ "geo_type": "Straight", "to": { "x": -21, "y": -51 } }],
+      "color": [255, 0, 255]
+    },
+    "S20": {
+      "from": { "x": -5, "y": -11 },
+      "geometries": [
+        {
+          "geo_type": { "Arc": { "angle": 75 } },
+          "to": { "x": -45, "y": -39 }
+        }
+      ],
+      "color": [0, 0, 255]
+    },
+    "S8": {
+      "from": { "x": 42, "y": 21 },
+      "geometries": [
+        { "geo_type": "Straight", "to": { "x": 67, "y": 21 } },
+        {
+          "geo_type": { "Arc": { "angle": 75 } },
+          "to": { "x": 88, "y": 2 }
+        }
+      ],
+      "color": [255, 0, 255]
+    },
+    "S13": {
+      "from": { "x": -48, "y": -37 },
+      "geometries": [
+        {
+          "geo_type": { "Arc": { "angle": 120 } },
+          "to": { "x": -48, "y": 43 }
+        }
+      ],
+      "color": [255, 255, 255]
+    }
+  },
+  "parkinglot": {
     "S25": {
       "geometries": [
         { "Straight": { "length": 50 } },
@@ -55,7 +101,7 @@
     },
     "S13": {
       "geometries": [{ "Straight": { "length": 50 } }],
-      "color": [0, 0, 0]
+      "color": [255, 255, 255]
     }
   }
 }
