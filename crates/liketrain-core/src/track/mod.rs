@@ -59,6 +59,10 @@ impl Track {
         Ok(())
     }
 
+    pub fn switches(&self) -> impl Iterator<Item = (&SwitchId, &Switch)> {
+        self.switches.iter()
+    }
+
     pub fn switch(&self, switch_id: &SwitchId) -> Option<&Switch> {
         self.switches.get(switch_id)
     }

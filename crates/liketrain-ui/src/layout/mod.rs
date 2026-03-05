@@ -1,26 +1,27 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    f32::{self},
-    rc::Rc,
-};
+use std::{collections::HashMap, f32, rc::Rc};
 
-use either::Either;
 use gpui::{
-    Bounds, IntoElement, PathBuilder, Pixels, Point, RenderOnce, Styled, Window, canvas, point, px,
+    Bounds, IntoElement, PathBuilder, Pixels, Point, RenderOnce, Styled, Window, canvas, fill,
+    point, px, size,
 };
-use liketrain_core::{Direction, SectionEnd, SectionId, SectionTransition, SwitchState, Track};
+use liketrain_core::{SectionId, SwitchId, Track};
 use serde::{Deserialize, Serialize, de::Visitor};
+use strum::IntoEnumIterator;
 use vek::Vec2;
 
-use crate::layout::{color::LayoutColor, vec::Vec2Ext};
+use crate::layout::{
+    camera::LayoutCamera,
+    color::LayoutColor,
+    switch::{SwitchResolution, SwitchResolutionEnd, SwitchResolutionState},
+    vec::Vec2Ext,
+};
 
+mod camera;
 mod color;
+mod switch;
 mod vec;
 
-const SECTION_STROKE_WIDTH: f32 = 4.0;
-
-const TRANSITION_STROKE_WIDTH: f32 = 4.0;
-const TRANSITION_COLOR: LayoutColor = LayoutColor::from_rgb(0, 255, 0);
+const SECTION_STROKE_WIDTH: f32 = 1.0;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LayoutSectionId(SectionId);
@@ -81,9 +82,15 @@ impl<'de> Deserialize<'de> for LayoutSectionId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LayoutSectionGeometry {
-    Straight { length: f32 },
-    Arc { offset: vek::Vec2<f32>, angle: f32 },
+pub struct LayoutSectionGeometry {
+    pub to: Point<Pixels>,
+    pub geo_type: LayoutSectionGeometryType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayoutSectionGeometryType {
+    Straight,
+    Arc { angle: f32 },
 }
 
 #[derive(Clone)]
@@ -133,52 +140,38 @@ impl LayoutSectionGeometryRenderResult {
 impl LayoutSectionGeometry {
     fn render(
         &self,
-        prev_render_result: LayoutSectionGeometryRenderResult,
+        from: Point<Pixels>,
         color: LayoutColor,
-        reverse: bool,
+        camera: &LayoutCamera,
         window: &mut Window,
-    ) -> LayoutSectionGeometryRenderResult {
+    ) {
         let gpui_color: gpui::Rgba = color.into();
 
-        match *self {
-            Self::Straight { length } => {
-                let mut path_builder = PathBuilder::stroke(px(SECTION_STROKE_WIDTH));
-                path_builder.move_to(prev_render_result.origin);
+        let from = camera.project(from);
+        let to = camera.project(self.to);
+        let stroke_width = camera.scale(SECTION_STROKE_WIDTH);
 
-                let destination = prev_render_result.origin
-                    + (prev_render_result.direction.to_normalized_point() * length);
+        match self.geo_type {
+            LayoutSectionGeometryType::Straight => {
+                let mut path_builder = PathBuilder::stroke(px(stroke_width));
+                path_builder.move_to(from);
 
-                path_builder.line_to(destination);
+                path_builder.line_to(to);
 
                 let path = path_builder.build().unwrap();
                 window.paint_path(path, gpui_color);
-
-                LayoutSectionGeometryRenderResult {
-                    origin: destination,
-                    direction: prev_render_result.direction,
-                }
             }
-            Self::Arc { mut offset, angle } => {
-                let mut path_builder = PathBuilder::stroke(px(SECTION_STROKE_WIDTH));
-                path_builder.move_to(prev_render_result.origin);
+            LayoutSectionGeometryType::Arc { angle } => {
+                let mut path_builder = PathBuilder::stroke(px(stroke_width));
+                path_builder.move_to(from);
 
-                if reverse {
-                    offset = -offset;
-                }
-
-                let origin = Vec2::from_point(prev_render_result.origin);
-                let end =
-                    Vec2::from_point(prev_render_result.with_normal_offset(offset, true).origin);
-
-                let prev_direction = prev_render_result.direction;
+                let offset = Vec2::from_point(to - from);
 
                 let actual_angle = offset.x.atan2(offset.y);
 
                 let angle = angle.abs().to_radians() * actual_angle.signum();
 
-                let new_direction = prev_direction.rotated_z(angle);
-
-                let chord_len = (end - origin).magnitude();
+                let chord_len = (to - from).magnitude() as f32;
                 let abs_angle = angle.abs();
 
                 let r = chord_len / (2.0 * (abs_angle / 2.0).sin());
@@ -187,17 +180,12 @@ impl LayoutSectionGeometry {
                     point(px(r), px(r)),
                     px(0.0),
                     false,
-                    actual_angle > 0.0,
-                    end.to_point(),
+                    actual_angle > f32::consts::PI,
+                    to,
                 );
 
                 let path = path_builder.build().unwrap();
                 window.paint_path(path, gpui_color);
-
-                LayoutSectionGeometryRenderResult {
-                    origin: end.to_point(),
-                    direction: new_direction,
-                }
             }
         }
     }
@@ -205,8 +193,16 @@ impl LayoutSectionGeometry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutSection {
+    from: Point<Pixels>,
     geometries: Vec<LayoutSectionGeometry>,
+
     color: LayoutColor,
+}
+
+impl LayoutSection {
+    fn to(&self) -> Point<Pixels> {
+        self.geometries.last().map(|g| g.to).unwrap_or(self.from)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,184 +210,47 @@ pub struct Layout {
     sections: HashMap<LayoutSectionId, LayoutSection>,
 }
 
-struct SectionVisit {
-    section_id: LayoutSectionId,
-
-    prev_render_result: LayoutSectionGeometryRenderResult,
-
-    section_direction: Direction,
+#[derive(Debug, Clone)]
+pub struct ResolvedLayout {
+    layout: Layout,
+    switch_resolutions: HashMap<SwitchId, SwitchResolution>,
 }
 
-impl Layout {
-    fn render_transition(
-        &self,
-        transition: SectionTransition,
-        destination_section_id: LayoutSectionId,
-        prev_render_result: &LayoutSectionGeometryRenderResult,
-        window: &mut Window,
-    ) -> SectionVisit {
-        let switch_x_offset = 10.0;
-        let switch_y_offset = 10.0;
-
-        let switches = transition.required_switch_changes();
-        let normal_offset =
-            switches
-                .into_iter()
-                .fold(vek::Vec2::new(0.0, 0.0), |acc, switch_change| {
-                    match (switch_change.is_switch_back, switch_change.required_state) {
-                        (false, SwitchState::Left) => {
-                            acc + vek::Vec2::new(-switch_x_offset, switch_y_offset)
-                        }
-                        (false, SwitchState::Right) => {
-                            acc + vek::Vec2::new(switch_x_offset, switch_y_offset)
-                        }
-
-                        (true, SwitchState::Left) => {
-                            acc + vek::Vec2::new(-switch_x_offset, switch_y_offset)
-                        }
-                        (true, SwitchState::Right) => {
-                            acc + vek::Vec2::new(switch_x_offset, switch_y_offset)
-                        }
-                    }
-                });
-
-        let new_render_result = prev_render_result.with_normal_offset(normal_offset, false);
-
-        // draw the transition
-        {
-            let mut path_builder = PathBuilder::stroke(px(TRANSITION_STROKE_WIDTH));
-            path_builder.move_to(prev_render_result.origin);
-            path_builder.line_to(new_render_result.origin);
-            let path = path_builder.build().unwrap();
-            window.paint_path(path, gpui::Rgba::from(TRANSITION_COLOR));
-        }
-
-        SectionVisit {
-            section_id: destination_section_id,
-            prev_render_result: new_render_result,
-            section_direction: match transition.destination_section_end() {
-                SectionEnd::Start => Direction::Forward,
-                SectionEnd::End => Direction::Backward,
-            },
-        }
-    }
-
+impl ResolvedLayout {
     fn render(
         &self,
-        track: &Track,
+        _track: &Track,
         config: LayoutRenderConfig,
         bounds: Bounds<Pixels>,
         window: &mut Window,
     ) {
-        let absolute_starting_point = bounds.origin
-            + point(
-                config.starting_point.x * bounds.size.width.as_f32(),
-                config.starting_point.y * bounds.size.height.as_f32(),
-            );
-        let mut visited_sections = HashMap::new();
+        let camera = LayoutCamera::new(bounds)
+            .with_zoom(config.zoom)
+            .with_center(config.center);
 
-        let mut sections_to_visit = VecDeque::new();
+        // draw sections
+        for (_, layout_section) in self.layout.sections.iter() {
+            layout_section
+                .geometries
+                .iter()
+                .fold(layout_section.from, |from, geo| {
+                    geo.render(from, layout_section.color, &camera, window);
+                    geo.to
+                });
+        }
 
-        sections_to_visit.push_back(SectionVisit {
-            section_id: config.starting_section.into(),
-            prev_render_result: LayoutSectionGeometryRenderResult {
-                origin: absolute_starting_point,
-                direction: config.forward_direction,
-            },
-            section_direction: Direction::Forward,
-        });
-
-        sections_to_visit.push_back(SectionVisit {
-            section_id: config.starting_section.into(),
-            prev_render_result: LayoutSectionGeometryRenderResult {
-                origin: absolute_starting_point,
-                direction: config.forward_direction,
-            },
-            section_direction: Direction::Backward,
-        });
-
-        while let Some(section) = sections_to_visit.pop_front() {
-            if visited_sections.contains_key(&section.section_id) {
-                continue;
-            }
-
-            let Some(layout_section) = self.sections.get(&section.section_id) else {
-                continue;
-            };
-
-            // draw this section
-            let new_render_result = match section.section_direction {
-                Direction::Forward => Either::Left(layout_section.geometries.iter()),
-                Direction::Backward => Either::Right(layout_section.geometries.iter().rev()),
-            }
-            .fold(section.prev_render_result.clone(), |render_result, geo| {
-                geo.render(
-                    render_result,
-                    layout_section.color,
-                    section.section_direction == Direction::Backward,
-                    window,
-                )
-            });
-
-            visited_sections.insert(
-                section.section_id,
-                (
-                    section.prev_render_result.clone(),
-                    new_render_result.clone(),
-                ),
-            );
-
-            // TODO: get the next sections
-            for transition in track
-                .transitions(section.section_id.0, section.section_direction)
-                // TODO: remove this
-                .unwrap_or_default()
-            {
-                let destination_section_id: LayoutSectionId = transition.destination().into();
-
-                if let Some((connected_render_result, _)) =
-                    visited_sections.get(&destination_section_id)
-                {
-                    let mut path_builder = PathBuilder::stroke(px(SECTION_STROKE_WIDTH));
-                    path_builder.move_to(new_render_result.origin);
-                    path_builder.line_to(connected_render_result.origin);
-                    let path = path_builder.build().unwrap();
-
-                    let gpui_color: gpui::Rgba = layout_section.color.into();
-                    window.paint_path(path, gpui_color);
-
+        // draw switches
+        for (_, resolution) in self.switch_resolutions.iter() {
+            for end in SwitchResolutionEnd::iter() {
+                let SwitchResolutionState::Resolved(point) = resolution.get(end) else {
                     continue;
-                }
+                };
 
-                let visit = self.render_transition(
-                    transition,
-                    destination_section_id,
-                    &new_render_result,
-                    window,
-                );
-                sections_to_visit.push_back(visit);
+                let point = camera.project(*point);
+                let size = camera.scale_size(size(px(2.0), px(2.0)));
+
+                window.paint_quad(fill(Bounds::centered_at(point, size), gpui::green()));
             }
-
-            /*
-            for back_transition in track
-                .transitions(section.section_id.0, section.section_direction.opposite())
-                .unwrap_or_default()
-                .into_iter()
-            {
-                let destination_section_id = back_transition.destination().into();
-
-                if visited_sections.contains_key(&destination_section_id) {
-                    continue;
-                }
-
-                let visit = self.render_transition(
-                    back_transition,
-                    destination_section_id,
-                    &section.prev_render_result.opposite(),
-                    window,
-                );
-                sections_to_visit.push_back(visit);
-            }*/
         }
     }
 
@@ -406,19 +265,16 @@ impl Layout {
 
 #[derive(Debug)]
 pub struct LayoutRenderConfig {
-    /// The section to start rendering from
-    pub starting_section: SectionId,
+    /// The zoom level to render at
+    pub zoom: f32,
 
-    /// The relative point (0.0..=1.0) from where to start rendering within the starting_section
-    pub starting_point: Point<Pixels>,
-
-    /// The angle of the forward direction of the starting_section
-    pub forward_direction: vek::Vec2<f32>,
+    /// The center point to render at
+    pub center: Point<Pixels>,
 }
 
 #[derive(IntoElement)]
 pub struct LayoutRenderer {
-    layout: Layout,
+    layout: ResolvedLayout,
     track: Rc<Track>,
 
     config: LayoutRenderConfig,

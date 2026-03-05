@@ -20,3 +20,5 @@ log.workspace = true
 env_logger = "0.11.9"
 vek = "0.17.2"
 either = "1.15.0"
+
+strum = {version = "0.28.0", features = ["derive"]}

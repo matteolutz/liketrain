@@ -1,14 +1,29 @@
 {
   "sections": {
     "S21": {
+      "from": { "x": 0.0, "y": 0.0 },
       "geometries": [
-        { "Straight": { "length": 100 } },
-        { "Arc": { "offset": [-25, 25], "angle": 60 } },
-        { "Straight": { "length": 10 } },
-        { "Arc": { "offset": [-25, 25], "angle": 90 } }
+        { "geo_type": "Straight", "to": { "x": 30, "y": 45 } },
+        { "geo_type": { "Arc": { "angle": 60 } }, "to": { "x": 50, "y": 55 } },
+        { "geo_type": "Straight", "to": { "x": 75, "y": 55 } },
+        { "geo_type": { "Arc": { "angle": 90 } }, "to": { "x": 90, "y": 30 } },
+        { "geo_type": "Straight", "to": { "x": 90, "y": 5 } }
       ],
       "color": [0, 0, 0]
     },
+    "S22": {
+      "from": { "x": 90, "y": 0 },
+      "geometries": [
+        { "geo_type": "Straight", "to": { "x": 90, "y": -30 } },
+        {
+          "geo_type": { "Arc": { "angle": 90 } },
+          "to": { "x": 75, "y": -55 }
+        }
+      ],
+      "color": [255, 0, 0]
+    }
+  },
+  "parkinglot": {
     "S22": {
       "geometries": [
         { "Straight": { "length": 70 } },
