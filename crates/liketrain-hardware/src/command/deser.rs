@@ -1,9 +1,4 @@
-use crate::{
-    command::HardwareCommand,
-    deser::Deser,
-    deser_variant,
-    event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState},
-};
+use crate::{command::HardwareCommand, deser::Deser, deser_variant};
 
 deser_variant! {
     HardwareCommandType {
@@ -20,20 +15,6 @@ impl Deser for HardwareCommand {
 
     type Error = ();
 
-    fn payload_size(variant: Self::Variant) -> crate::deser::DeserSize {
-        match variant {
-            HardwareCommandType::Ping => 8.into(),
-            HardwareCommandType::GetSlaves => 0.into(),
-            HardwareCommandType::ResetAll => 0.into(),
-            HardwareCommandType::SetSectionPower => {
-                (4 + core::mem::size_of::<HardwareSectionPower>()).into()
-            }
-            HardwareCommandType::SetSwitchState => (core::mem::size_of::<HardwareSwitchId>()
-                + core::mem::size_of::<HardwareSwitchState>())
-            .into(),
-        }
-    }
-
     fn variant(&self) -> Self::Variant {
         match self {
             Self::Ping { .. } => HardwareCommandType::Ping,
@@ -46,7 +27,6 @@ impl Deser for HardwareCommand {
 
     fn deser_deserialize(
         variant: Self::Variant,
-        _payload_size: u32,
         mut buffer: crate::deser::DeserPayloadReader,
     ) -> Result<Self, crate::deser::DeserError<Self::Error>> {
         match variant {

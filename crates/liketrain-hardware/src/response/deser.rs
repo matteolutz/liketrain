@@ -4,7 +4,7 @@ pub use alloc::string::String;
 use alloc::vec;
 
 use crate::{
-    deser::{Deser, DeserHelper, DeserSize},
+    deser::{Deser, DeserHelper},
     deser_variant,
     event::HardwareEvent,
     response::HardwareResponse,
@@ -24,14 +24,6 @@ impl Deser for HardwareResponse {
 
     type Error = ();
 
-    fn payload_size(variant: Self::Variant) -> DeserSize {
-        match variant {
-            HardwareResponseType::Ack => 0.into(),
-            HardwareResponseType::DebugMessage => DeserSize::Variable,
-            HardwareResponseType::Event => DeserSize::Irrelevant,
-        }
-    }
-
     fn variant(&self) -> Self::Variant {
         match self {
             HardwareResponse::Ack => HardwareResponseType::Ack,
@@ -42,13 +34,13 @@ impl Deser for HardwareResponse {
 
     fn deser_deserialize(
         variant: Self::Variant,
-        payload_size: u32,
         mut buffer: crate::deser::DeserPayloadReader,
     ) -> Result<Self, crate::deser::DeserError<Self::Error>> {
         match variant {
             HardwareResponseType::Ack => Ok(HardwareResponse::Ack),
             HardwareResponseType::DebugMessage => {
-                let mut str_buffer = vec![0_u8; payload_size as usize];
+                let len = buffer.parse_u32()?;
+                let mut str_buffer = vec![0_u8; len as usize];
 
                 for byte in str_buffer.iter_mut() {
                     *byte = buffer.parse_u8()?;
@@ -73,7 +65,7 @@ impl Deser for HardwareResponse {
             HardwareResponse::DebugMessage { message } => {
                 let bytes = message.bytes();
 
-                buffer.write_size(bytes.len() as u32)?;
+                buffer.write_u32(bytes.len() as u32)?;
                 for byte in bytes {
                     buffer.write_u8(byte)?;
                 }

@@ -26,17 +26,6 @@ impl Deser for HardwareEvent {
 
     type Error = ();
 
-    fn payload_size(variant: Self::Variant) -> crate::deser::DeserSize {
-        match variant {
-            HardwareEventType::SectionEvent => core::mem::size_of::<SectionEvent>().into(),
-            HardwareEventType::Pong => 8.into(),
-            HardwareEventType::SwitchStateChange => {
-                core::mem::size_of::<HardwareEventSwitchStateChange>().into()
-            }
-            HardwareEventType::Slaves => 4.into(),
-        }
-    }
-
     fn variant(&self) -> Self::Variant {
         match self {
             Self::SectionEvent { .. } => HardwareEventType::SectionEvent,
@@ -48,7 +37,6 @@ impl Deser for HardwareEvent {
 
     fn deser_deserialize(
         variant: Self::Variant,
-        _payload_size: u32,
         mut payload: DeserPayloadReader,
     ) -> Result<Self, DeserError<Self::Error>> {
         match variant {

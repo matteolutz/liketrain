@@ -3,27 +3,6 @@ use alloc::vec::Vec;
 
 mod variant;
 
-pub enum DeserSize {
-    /// For this message type, the payload size is fixed
-    Fixed(u32),
-
-    /// For this message type, the payload size is variable.
-    /// This means we need to read the size as the u32 after the variant in the buffer.
-    ///  If the size is not written using `write_size`
-    Variable,
-
-    /// For this message type, the payload size is irrelevant.
-    /// This is used when you want to serialize/deserialize a child object
-    /// that also implements `Deser`.
-    Irrelevant,
-}
-
-impl From<usize> for DeserSize {
-    fn from(value: usize) -> Self {
-        DeserSize::Fixed(value as u32)
-    }
-}
-
 pub struct DeserPayloadReader<'a>(&'a [u8]);
 
 impl DeserPayloadReader<'_> {
@@ -77,23 +56,11 @@ impl DeserPayloadReader<'_> {
 
 pub struct DeserPayloadWriter<'a> {
     buffer: &'a mut Vec<u8>,
-    size_written: &'a mut bool,
 }
 
 impl DeserPayloadWriter<'_> {
     pub fn buffer(&mut self) -> &mut Vec<u8> {
         self.buffer
-    }
-
-    pub fn write_size<E: core::fmt::Debug>(&mut self, value: u32) -> Result<(), DeserError<E>> {
-        if *self.size_written {
-            return Err(DeserError::SizeWasAlreadyWritten);
-        }
-
-        self.write_u32(value)?;
-        *self.size_written = true;
-
-        Ok(())
     }
 
     pub fn write_u8<E: core::fmt::Debug>(&mut self, value: u8) -> Result<(), DeserError<E>> {
@@ -150,9 +117,6 @@ pub trait Deser: Sized {
 
     type Error: core::fmt::Debug;
 
-    /// Get the size of the payload for a given variant
-    fn payload_size(variant: Self::Variant) -> DeserSize;
-
     /// Get the variant of this message
     fn variant(&self) -> Self::Variant;
 
@@ -160,7 +124,6 @@ pub trait Deser: Sized {
     /// It is guaranteed that `payload_buffer` is at exactly `payload_size` bytes long.
     fn deser_deserialize(
         variant: Self::Variant,
-        payload_size: u32,
         buffer: DeserPayloadReader,
     ) -> Result<Self, DeserError<Self::Error>>;
 
@@ -185,24 +148,14 @@ pub trait DeserHelper<T: Deser>: Sized {
 
 impl<T: Deser> DeserHelper<T> for T {
     fn serialize_into(&self, buffer: &mut Vec<u8>) -> Result<(), DeserError<<T as Deser>::Error>> {
-        let mut size_written = false;
-
-        let mut writer = DeserPayloadWriter {
-            buffer,
-            size_written: &mut size_written,
-        };
+        let mut writer = DeserPayloadWriter { buffer };
 
         let variant = self.variant();
-        let size = Self::payload_size(variant);
 
         let variant_byte: u8 = variant.into();
         writer.write_u8(variant_byte)?;
 
         self.deser_serialize(writer)?;
-
-        if matches!(size, DeserSize::Variable) && !size_written {
-            return Err(DeserError::SizeWasNotWritten);
-        }
 
         Ok(())
     }
@@ -217,20 +170,8 @@ impl<T: Deser> DeserHelper<T> for T {
             .try_into()
             .map_err(|_| DeserError::InvalidVariant(variant))?;
 
-        let mut buffer = DeserPayloadReader(&buffer[1..]);
+        let buffer = DeserPayloadReader(&buffer[1..]);
 
-        let size = match T::payload_size(variant) {
-            DeserSize::Fixed(size) => size,
-            DeserSize::Variable => {
-                if buffer.len() < 4 {
-                    return Err(DeserError::UnexpectedEndOfBuffer);
-                }
-
-                buffer.parse_u32::<T::Error>().unwrap()
-            }
-            DeserSize::Irrelevant => 0,
-        };
-
-        Self::deser_deserialize(variant, size, buffer)
+        Self::deser_deserialize(variant, buffer)
     }
 }
