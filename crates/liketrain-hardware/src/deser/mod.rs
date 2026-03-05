@@ -14,7 +14,7 @@ impl DeserPayloadReader<'_> {
         self.0
     }
 
-    pub fn parse_u8<E: core::fmt::Debug>(&mut self) -> Result<u8, DeserError<E>> {
+    pub fn read_u8<E: core::fmt::Debug>(&mut self) -> Result<u8, DeserError<E>> {
         let result = self
             .0
             .first()
@@ -24,28 +24,28 @@ impl DeserPayloadReader<'_> {
         Ok(result)
     }
 
-    pub fn parse_u16<E: core::fmt::Debug>(&mut self) -> Result<u16, DeserError<E>> {
-        let result = u16::from_le_bytes([self.parse_u8()?, self.parse_u8()?]);
+    pub fn read_u16<E: core::fmt::Debug>(&mut self) -> Result<u16, DeserError<E>> {
+        let result = u16::from_le_bytes([self.read_u8()?, self.read_u8()?]);
         Ok(result)
     }
 
-    pub fn parse_u32<E: core::fmt::Debug>(&mut self) -> Result<u32, DeserError<E>> {
+    pub fn read_u32<E: core::fmt::Debug>(&mut self) -> Result<u32, DeserError<E>> {
         let result = u32::from_le_bytes([
-            self.parse_u8()?,
-            self.parse_u8()?,
-            self.parse_u8()?,
-            self.parse_u8()?,
+            self.read_u8()?,
+            self.read_u8()?,
+            self.read_u8()?,
+            self.read_u8()?,
         ]);
         Ok(result)
     }
 
-    pub fn parse<T, E: core::fmt::Debug>(&mut self) -> Result<T, DeserError<E>> {
+    pub fn read<T, E: core::fmt::Debug>(&mut self) -> Result<T, DeserError<E>> {
         let size = core::mem::size_of::<T>();
         let mut buffer = core::mem::MaybeUninit::<T>::uninit();
         let buf_ptr = buffer.as_mut_ptr() as *mut u8;
 
         for i in 0..size {
-            let byte = self.parse_u8()?;
+            let byte = self.read_u8()?;
             unsafe { *buf_ptr.add(i) = byte };
         }
 

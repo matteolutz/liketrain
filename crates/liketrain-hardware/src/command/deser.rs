@@ -31,20 +31,20 @@ impl Deser for HardwareCommand {
     ) -> Result<Self, crate::deser::DeserError<Self::Error>> {
         match variant {
             HardwareCommandType::Ping => {
-                let slave_id = buffer.parse_u32()?;
-                let seq = buffer.parse_u32()?;
+                let slave_id = buffer.read_u32()?;
+                let seq = buffer.read_u32()?;
                 Ok(Self::Ping { slave_id, seq })
             }
             HardwareCommandType::GetSlaves => Ok(Self::GetSlaves),
             HardwareCommandType::ResetAll => Ok(Self::ResetAll),
             HardwareCommandType::SetSectionPower => {
-                let section_id = buffer.parse_u32()?;
-                let power = buffer.parse()?;
+                let section_id = buffer.read_u32()?;
+                let power = buffer.read()?;
                 Ok(Self::SetSectionPower { section_id, power })
             }
             HardwareCommandType::SetSwitchState => {
-                let switch_id = buffer.parse()?;
-                let state = buffer.parse()?;
+                let switch_id = buffer.read()?;
+                let state = buffer.read()?;
                 Ok(Self::SetSwitchState { switch_id, state })
             }
         }

@@ -39,11 +39,11 @@ impl Deser for HardwareResponse {
         match variant {
             HardwareResponseType::Ack => Ok(HardwareResponse::Ack),
             HardwareResponseType::DebugMessage => {
-                let len = buffer.parse_u32()?;
+                let len = buffer.read_u32()?;
                 let mut str_buffer = vec![0_u8; len as usize];
 
                 for byte in str_buffer.iter_mut() {
-                    *byte = buffer.parse_u8()?;
+                    *byte = buffer.read_u8()?;
                 }
 
                 let message = String::from_utf8(str_buffer).map_err(|_| ())?;

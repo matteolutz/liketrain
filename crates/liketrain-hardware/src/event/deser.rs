@@ -41,21 +41,21 @@ impl Deser for HardwareEvent {
     ) -> Result<Self, DeserError<Self::Error>> {
         match variant {
             HardwareEventType::Pong => {
-                let slave_id = payload.parse_u32()?;
-                let seq = payload.parse_u32()?;
+                let slave_id = payload.read_u32()?;
+                let seq = payload.read_u32()?;
                 Ok(Self::Pong { slave_id, seq })
             }
             HardwareEventType::Slaves => {
-                let n_slaves = payload.parse_u32()?;
+                let n_slaves = payload.read_u32()?;
                 Ok(Self::Slaves { n_slaves })
             }
             HardwareEventType::SectionEvent => {
-                let section_event: SectionEvent = payload.parse()?;
+                let section_event: SectionEvent = payload.read()?;
                 Ok(Self::SectionEvent(section_event))
             }
             HardwareEventType::SwitchStateChange => {
-                let switch_id: HardwareSwitchId = payload.parse()?;
-                let state: HardwareSwitchState = payload.parse()?;
+                let switch_id: HardwareSwitchId = payload.read()?;
+                let state: HardwareSwitchState = payload.read()?;
 
                 Ok(Self::SwitchStateChanged { switch_id, state })
             }
