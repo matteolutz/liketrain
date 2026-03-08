@@ -16,13 +16,17 @@
 DeserHeapBufferDeserializer deser;
 DeserBufferSerializer<128> ser;
 
-DeserSerial usb_serial(Serial);
-
 RS485 rs485(Serial1, 52, 53);
 DeserSerial rs485_serial(rs485);
 
 Queue<LiketrainEvent> events(32);
 Queue<LiketrainCommand> slave_relay(32);
+
+#ifdef IS_MASTER
+DeserSerial usb_serial(Serial);
+
+SwitchMaster switch_master(Relais(2));
+#endif
 
 // Whether to send an ACK response to the host after processing the next command.
 // Set to true when a command is received, and set back to false after sending the ACK.
@@ -32,7 +36,7 @@ bool send_ack = false;
 #ifdef IS_MASTER
 void read_host_commands();
 void poll_slaves();
-void send_events_to_host();
+void handle_events();
 void send_ack_to_host();
 #endif
 
@@ -58,7 +62,11 @@ void setup()
     delay(100);
   }
 
+  // TODO: init sections
+
 #ifdef IS_MASTER
+  switch_master.init();
+
   usb_serial.init();
 #endif
 
@@ -75,12 +83,16 @@ void loop()
 
 #ifdef IS_MASTER
   poll_slaves();
+
+  // if the switch master relais was armed
+  // toggle it, which will cause it to change the switch state
+  switch_master.update();
 #endif
 
   // TODO: update sections
 
 #ifdef IS_MASTER
-  send_events_to_host();
+  handle_events();
 #endif
 
 #ifdef IS_MASTER
@@ -172,11 +184,18 @@ void poll_slaves()
   }
 }
 
-void send_events_to_host()
+void handle_events()
 {
   LiketrainEvent evt;
   while (events.dequeue(evt))
   {
+    if (evt.type == LiketrainEventType::SwitchStateChange)
+    {
+      // this will cause the switch master relais to toggle
+      // in the next loop iteration
+      switch_master.arm();
+    }
+
     auto response = LiketrainResponse::event(evt);
 
     ser.reset();
@@ -209,6 +228,9 @@ void read_master_commands()
 
     switch (cmd.type)
     {
+    case LiketrainSlaveCommandType::Invalid:
+      // shouldn't happen
+      break;
     case LiketrainSlaveCommandType::Command:
       handle_command(*cmd.data.command.command);
       break;
@@ -250,6 +272,7 @@ bool handle_command(LiketrainCommand &cmd)
   {
     if (slave_id.get() != cmd.data.ping.slave_id)
     {
+      // not for me
       return false;
     }
 
@@ -262,6 +285,7 @@ bool handle_command(LiketrainCommand &cmd)
   {
     if (!slave_id.is_master())
     {
+      // slaves should not receive this command
       return false;
     }
 

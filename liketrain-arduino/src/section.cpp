@@ -3,6 +3,11 @@
 Section::Section(uint8_t section_id, SectionPowerRelais relais, uint8_t train_detection_pin)
     : section_id(section_id), power_relais(relais), train_detection_pin(train_detection_pin)
 {
+}
+
+void Section::init()
+{
+    power_relais.init();
     pinMode(train_detection_pin, INPUT);
 }
 

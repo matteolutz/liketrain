@@ -44,6 +44,8 @@ public:
         case LiketrainResponseType::Event:
             delete data.event.event;
             break;
+        default:
+            break;
         }
     }
 
@@ -79,6 +81,8 @@ public:
         case LiketrainResponseType::Event:
             data.event.event->serialize(ser);
             break;
+        case LiketrainResponseType::Ack:
+            break;
         }
     }
 
@@ -99,6 +103,8 @@ public:
         case LiketrainResponseType::Event:
             data.event.event = new LiketrainEvent();
             data.event.event->deserialize(deser);
+            break;
+        case LiketrainResponseType::Ack:
             break;
         }
     }

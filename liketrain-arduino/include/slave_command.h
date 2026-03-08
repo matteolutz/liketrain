@@ -39,6 +39,8 @@ public:
         case LiketrainSlaveCommandType::Command:
             delete data.command.command;
             break;
+        default:
+            break;
         }
     }
 

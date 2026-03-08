@@ -38,6 +38,8 @@ public:
         case LiketrainSlaveResponseType::Event:
             delete data.event.event;
             break;
+        default:
+            break;
         }
     }
 

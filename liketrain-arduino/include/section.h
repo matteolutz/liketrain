@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+#include "relais.h"
 #include "queue.h"
 #include "event.h"
 
@@ -20,39 +21,35 @@ enum class SectionPower : uint8_t
 class SectionPowerRelais
 {
 private:
-    uint8_t relais[4];
+    Relais relais[4];
     SectionPower current_power = SectionPower::Off;
 
 private:
-    size_t power_to_relais_idx(SectionPower power)
+    Relais *power_to_relais(SectionPower power)
     {
         switch (power)
         {
         case SectionPower::Off:
-            return -1;
+            return nullptr;
         case SectionPower::Quarter:
-            return 0;
+            return &relais[0];
         case SectionPower::Half:
-            return 1;
+            return &relais[1];
         case SectionPower::ThreeQuarters:
-            return 2;
+            return &relais[2];
         case SectionPower::Full:
-            return 3;
+            return &relais[3];
         }
     }
 
 public:
-    SectionPowerRelais(uint8_t relais1, uint8_t relais2, uint8_t relais3, uint8_t relais4)
-    {
-        relais[0] = relais1;
-        relais[1] = relais2;
-        relais[2] = relais3;
-        relais[3] = relais4;
+    SectionPowerRelais(Relais relais_a, Relais relais_b, Relais relais_c, Relais relais_d) : relais{relais_a, relais_b, relais_c, relais_d} {}
 
-        for (int i = 0; i < 4; i++)
+    void init()
+    {
+        for (size_t i = 0; i < 4; i++)
         {
-            pinMode(relais[i], OUTPUT);
-            digitalWrite(relais[i], LOW);
+            relais[i].init();
         }
     }
 
@@ -69,7 +66,7 @@ public:
         if (previous_power != SectionPower::Off)
         {
             // we need to turn of the previous power level relais
-            digitalWrite(relais[power_to_relais_idx(previous_power)], LOW);
+            power_to_relais(previous_power)->off();
 
             // if we need to power up a different relais, delay
             if (power != SectionPower::Off)
@@ -80,7 +77,7 @@ public:
 
         if (power != SectionPower::Off)
         {
-            digitalWrite(relais[power_to_relais_idx(power)], HIGH);
+            power_to_relais(power)->on();
         }
     }
 };
@@ -97,6 +94,8 @@ private:
 
 public:
     Section(uint8_t section_id, SectionPowerRelais relais, uint8_t train_detection_pin);
+
+    void init();
 
     bool occupied() const { return is_occupied; }
 
