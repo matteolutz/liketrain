@@ -22,3 +22,4 @@ vek = "0.17.2"
 either = "1.15.0"
 
 strum = {version = "0.28.0", features = ["derive"]}
+chrono = "0.4.44"

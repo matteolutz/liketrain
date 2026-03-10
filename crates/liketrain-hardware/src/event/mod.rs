@@ -25,6 +25,10 @@ pub enum HardwareEvent {
     },
 
     SectionEvent(SectionEvent),
+    SectionPowerChanged {
+        section_id: u32,
+        power: HardwareSectionPower,
+    },
 
     SwitchStateChanged {
         switch_id: HardwareSwitchId,

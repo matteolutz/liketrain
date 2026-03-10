@@ -3,6 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
+    ui::{UiEvent, UiSectionEvent, UiSwitchEvent},
 };
 
 mod state;
@@ -22,6 +23,8 @@ pub use scheduler::*;
 
 mod event;
 pub use event::*;
+
+pub mod ui;
 
 pub struct ControllerConfig {
     pub track: Track,
@@ -57,12 +60,16 @@ pub struct Controller {
     section_reservations: HashMap<SectionId, TrainId>,
 
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
+
+    ui_event_tx: std::sync::mpsc::Sender<UiEvent>,
+    // TODO: ui_command_rx
 }
 
 impl Controller {
     pub fn new(
         config: ControllerConfig,
         hardware_comm: impl ControllerHardwareCommunication + 'static,
+        ui_event_tx: std::sync::mpsc::Sender<UiEvent>,
     ) -> Self {
         Self {
             track: config.track,
@@ -73,6 +80,7 @@ impl Controller {
             section_queues: HashMap::new(),
             section_reservations: HashMap::new(),
             hardware_comm: Box::new(hardware_comm),
+            ui_event_tx,
         }
     }
 
@@ -90,8 +98,20 @@ impl Controller {
 }
 
 impl Controller {
+    fn emit_ui(&self, event: impl Into<UiEvent>) {
+        let _ = self.ui_event_tx.send(event.into());
+    }
+}
+
+impl Controller {
     fn set_switch_state(&mut self, switch_id: SwitchId, state: impl Into<SwitchState>) {
-        self.switch_states.insert(switch_id, state.into());
+        let state = state.into();
+        self.switch_states.insert(switch_id.clone(), state);
+
+        self.emit_ui(UiSwitchEvent::SetState {
+            id: switch_id,
+            state,
+        });
     }
 
     fn try_reserve_section(&mut self, section_id: SectionId, train_id: TrainId) -> bool {
@@ -113,12 +133,21 @@ impl Controller {
         }
 
         self.section_reservations.insert(section_id, train_id);
+        self.emit_ui(UiSectionEvent::Reserved {
+            section_id,
+            train_id: Some(train_id),
+        });
+
         true
     }
 
     fn release_reservation(&mut self, section_id: SectionId, train_id: TrainId) {
         if self.section_reservations.get(&section_id) == Some(&train_id) {
             self.section_reservations.remove(&section_id);
+            self.emit_ui(UiSectionEvent::Reserved {
+                section_id,
+                train_id: None,
+            });
         }
     }
 
@@ -198,6 +227,18 @@ impl Controller {
             }
         }
     }
+
+    fn set_section_power(
+        &mut self,
+        section_id: SectionId,
+        power: HardwareSectionPower,
+        _ctx: EventExecutionContext,
+    ) {
+        let state = self.section_states.entry(section_id).or_default();
+        state.power = power;
+
+        self.emit_ui(UiSectionEvent::SetPower { section_id, power });
+    }
 }
 
 impl Controller {
@@ -207,14 +248,22 @@ impl Controller {
         ctx: EventExecutionContext,
     ) -> Result<(), ControllerError> {
         match event {
-            HardwareEvent::SectionEvent(section_event) => match section_event.event_type {
-                SectionEventType::Occupied => {
-                    self.set_section_occupied(section_event.section_id.into(), true, ctx)
+            HardwareEvent::SectionEvent(section_event) => {
+                // also emit this to the UI
+                self.emit_ui(UiSectionEvent::HardwareSectionEvent(section_event));
+
+                match section_event.event_type {
+                    SectionEventType::Occupied => {
+                        self.set_section_occupied(section_event.section_id.into(), true, ctx)
+                    }
+                    SectionEventType::Freed => {
+                        self.set_section_occupied(section_event.section_id.into(), false, ctx)
+                    }
                 }
-                SectionEventType::Freed => {
-                    self.set_section_occupied(section_event.section_id.into(), false, ctx)
-                }
-            },
+            }
+            HardwareEvent::SectionPowerChanged { section_id, power } => {
+                self.set_section_power(section_id.into(), power, ctx)
+            }
             HardwareEvent::SwitchStateChanged { switch_id, state } => {
                 let switch_id = SwitchId::from_hardware_id(&switch_id);
 
@@ -284,6 +333,10 @@ impl Controller {
                             .entry(next_section)
                             .or_default()
                             .push_back(train_id);
+                        self.emit_ui(UiSectionEvent::QueueEnqueued {
+                            section_id: next_section,
+                            train_id,
+                        });
                     }
                 }
             }
@@ -293,11 +346,16 @@ impl Controller {
             } => {
                 self.release_reservation(section_id, train_id);
 
-                if let Some(waiting_train_id) = self
+                while let Some(waiting_train_id) = self
                     .section_queues
                     .get_mut(&section_id)
                     .and_then(|queue| queue.pop_front())
                 {
+                    self.emit_ui(UiSectionEvent::QueueDequeued {
+                        section_id,
+                        train_id: waiting_train_id,
+                    });
+
                     // this train was on the queue for this section id
                     // this means, either the section was occupied before
                     // or there was another train inbound
@@ -308,7 +366,8 @@ impl Controller {
                         .is_none_or(|next_section| next_section != section_id)
                     {
                         // this train has changed its mind? it doesn't want to go to this section anymore
-                        return Ok(());
+                        // check if there's another train waiting on the queue
+                        continue;
                     }
 
                     let current_section = train.get_current_section().unwrap();
@@ -341,13 +400,15 @@ impl Controller {
                         section_id: section_id.as_u32(),
                         power: HardwareSectionPower::Full,
                     })?;
-                } else {
-                    // there are now waiting trains, unpower this section
-                    ctx.exec(HardwareCommand::SetSectionPower {
-                        section_id: section_id.as_u32(),
-                        power: HardwareSectionPower::Off,
-                    })?;
+
+                    return Ok(());
                 }
+
+                // there are now waiting trains, unpower this section
+                ctx.exec(HardwareCommand::SetSectionPower {
+                    section_id: section_id.as_u32(),
+                    power: HardwareSectionPower::Off,
+                })?;
             }
         }
 
@@ -430,23 +491,29 @@ impl Controller {
         ctx.exec(HardwareCommand::ResetAll)?;
 
         // initialize all the trains
-        for (&id, train) in &self.trains {
-            let Some(current_section) = train.get_current_section() else {
+        for (_, train) in &self.trains {
+            let Some(initial_section) = train.get_initial_section() else {
                 continue;
             };
 
             // power on the current section
             ctx.exec(HardwareCommand::SetSectionPower {
-                section_id: current_section.as_u32(),
+                section_id: initial_section.as_u32(),
                 power: HardwareSectionPower::Full,
             })?;
 
+            // powering up the initial section will cause the train to trigger the train detection sensor
+            // and cause a SectionOccupied event. Because the trains current section will be set to None,
+            // the `set_section_occupied` method will correctly identify this train as inbound to
+            // the initial section.
+
+            /*
             // this will set the next switches and power to the next section
             self.scheduler
                 .schedule_now(ScheduledEvent::TrainEnteredSection {
                     train_id: id,
                     section_id: current_section,
-                });
+                });*/
         }
 
         Ok(())

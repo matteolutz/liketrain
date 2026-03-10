@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use chumsky::Parser;
 use liketrain_core::{
     Controller, ControllerConfig, Direction, Route, Train,
@@ -103,6 +105,8 @@ fn test_controller() {
         trains: [(1_u32.into(), Train::from_route("RE5".into(), r1))].into(),
     };
 
-    let controller = Controller::new(controller_config, hardware_comm);
+    let (tx, _) = mpsc::channel();
+    let controller = Controller::new(controller_config, hardware_comm, tx);
+
     controller.start().unwrap();
 }

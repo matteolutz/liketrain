@@ -1,7 +1,9 @@
 use crate::{
     deser::{Deser, DeserError, DeserPayloadReader, DeserPayloadWriter},
     deser_variant,
-    event::{HardwareEvent, HardwareSwitchId, HardwareSwitchState, SectionEvent},
+    event::{
+        HardwareEvent, HardwareSectionPower, HardwareSwitchId, HardwareSwitchState, SectionEvent,
+    },
 };
 
 deser_variant! {
@@ -9,6 +11,7 @@ deser_variant! {
         Pong = 0x1,
         SectionEvent = 0x2,
         SwitchStateChange = 0x3,
+        SectionPowerChanged = 0x4,
 
         Slaves = 0x10
     }
@@ -29,6 +32,7 @@ impl Deser for HardwareEvent {
     fn variant(&self) -> Self::Variant {
         match self {
             Self::SectionEvent { .. } => HardwareEventType::SectionEvent,
+            Self::SectionPowerChanged { .. } => HardwareEventType::SectionPowerChanged,
             Self::Pong { .. } => HardwareEventType::Pong,
             Self::SwitchStateChanged { .. } => HardwareEventType::SwitchStateChange,
             Self::Slaves { .. } => HardwareEventType::Slaves,
@@ -59,6 +63,12 @@ impl Deser for HardwareEvent {
 
                 Ok(Self::SwitchStateChanged { switch_id, state })
             }
+            HardwareEventType::SectionPowerChanged => {
+                let section_id = payload.read_u32()?;
+                let power: HardwareSectionPower = payload.read()?;
+
+                Ok(Self::SectionPowerChanged { section_id, power })
+            }
         }
     }
 
@@ -83,6 +93,11 @@ impl Deser for HardwareEvent {
             Self::SwitchStateChanged { switch_id, state } => {
                 buffer.write(switch_id)?;
                 buffer.write(state)?;
+                Ok(())
+            }
+            Self::SectionPowerChanged { section_id, power } => {
+                buffer.write_u32(*section_id)?;
+                buffer.write(power)?;
                 Ok(())
             }
         }

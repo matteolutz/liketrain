@@ -5,10 +5,15 @@ use gpui::{
 };
 use liketrain_core::{Track, parser::Parser};
 
-use crate::layout::{Layout, LayoutRenderer, ResolvedLayout};
+use crate::{
+    ebula::{Ebula, EbulaTheme},
+    layout::{Layout, LayoutRenderer, ResolvedLayout},
+};
 
 mod app_ext;
+mod ebula;
 mod layout;
+mod ui;
 
 struct HelloWorld {
     renderer: Entity<LayoutRenderer>,
@@ -67,6 +72,19 @@ fn main() {
             |window, cx| {
                 window.set_window_title("liketrain");
                 cx.new(|cx| HelloWorld::new(track, resolved_layout, cx))
+            },
+        )
+        .unwrap();
+
+        let bounds = Bounds::centered(None, Ebula::get_window_size(600.0), cx);
+        cx.open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                ..Default::default()
+            },
+            |window, cx| {
+                window.set_window_title("liketrain - EBuLa");
+                cx.new(|cx| Ebula::new(EbulaTheme::default_light(), cx))
             },
         )
         .unwrap();

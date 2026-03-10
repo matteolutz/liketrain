@@ -1,7 +1,9 @@
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HardwareSectionPower {
+    #[default]
     Off = 0,
+
     Quarter = 1,
     Half = 2,
     ThreeQuarters = 3,

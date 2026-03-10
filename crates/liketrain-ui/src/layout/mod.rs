@@ -151,14 +151,14 @@ impl LayoutSectionGeometry {
         color: LayoutColor,
         camera: &LayoutCamera,
         window: &mut Window,
-    ) {
+    ) -> Point<Pixels> {
         let gpui_color: gpui::Rgba = color.into();
 
         let from = camera.project(from);
         let to = camera.project(self.to);
         let stroke_width = camera.scale(SECTION_STROKE_WIDTH);
 
-        match self.geo_type {
+        let path = match self.geo_type {
             LayoutSectionGeometryType::Straight => {
                 let mut path_builder = PathBuilder::stroke(px(stroke_width));
                 path_builder.move_to(from);
@@ -166,7 +166,7 @@ impl LayoutSectionGeometry {
                 path_builder.line_to(to);
 
                 let path = path_builder.build().unwrap();
-                window.paint_path(path, gpui_color);
+                path
             }
             LayoutSectionGeometryType::Arc { angle, sweep } => {
                 let mut path_builder = PathBuilder::stroke(px(stroke_width));
@@ -192,9 +192,14 @@ impl LayoutSectionGeometry {
                 );
 
                 let path = path_builder.build().unwrap();
-                window.paint_path(path, gpui_color);
+                path
             }
-        }
+        };
+
+        let center = path.bounds.center();
+
+        window.paint_path(path, gpui_color);
+        center
     }
 }
 

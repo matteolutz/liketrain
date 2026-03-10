@@ -47,6 +47,10 @@ impl Train {
 }
 
 impl Train {
+    pub fn get_initial_section(&self) -> Option<SectionId> {
+        self.mode.get_initial_section()
+    }
+
     pub fn get_current_section(&self) -> Option<SectionId> {
         self.mode.get_current_section()
     }
@@ -62,7 +66,7 @@ impl Train {
                 route,
                 current_via_idx,
                 ..
-            } => route.transition(*current_via_idx),
+            } => current_via_idx.and_then(|idx| route.transition(idx)),
         }
     }
 
@@ -85,7 +89,10 @@ impl Train {
                 current_section_direction,
                 ..
             } => {
-                *current_via_idx += 1;
+                match current_via_idx {
+                    Some(idx) => *idx += 1,
+                    None => *current_via_idx = Some(0),
+                }
 
                 match section_end {
                     SectionEnd::End => *current_section_direction = Direction::Backward,

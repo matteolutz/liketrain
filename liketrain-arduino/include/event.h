@@ -23,6 +23,7 @@ enum class LiketrainEventType : uint8_t
     Pong = 0x1,
     SectionEvent = 0x2,
     SwitchStateChange = 0x3,
+    SectionPowerChange = 0x4,
 
     Slaves = 0x10
 };
@@ -42,6 +43,12 @@ union LiketrainEventData
         SwitchId swtich_id;
         SwitchState state;
     } switch_state_change;
+
+    struct
+    {
+        uint32_t section_id;
+        SectionPower power;
+    } section_power_change;
 
     struct
     {
@@ -73,6 +80,15 @@ public:
         event.type = LiketrainEventType::SectionEvent;
         event.data.section_event.section_id = section_id;
         event.data.section_event.event_type = event_type;
+        return event;
+    }
+
+    static LiketrainEvent section_event(uint32_t section_id, SectionPower power)
+    {
+        LiketrainEvent event;
+        event.type = LiketrainEventType::SectionPowerChange;
+        event.data.section_power_change.section_id = section_id;
+        event.data.section_power_change.power = power;
         return event;
     }
 
@@ -114,6 +130,10 @@ public:
             ser.write(data.switch_state_change.swtich_id);
             ser.write_u8(static_cast<uint8_t>(data.switch_state_change.state));
             break;
+        case LiketrainEventType::SectionPowerChange:
+            ser.write_u32(data.section_power_change.section_id);
+            ser.write_u8(static_cast<uint8_t>(data.section_power_change.power));
+            break;
         case LiketrainEventType::Slaves:
             ser.write_u32(data.slaves.n_slaves);
             break;
@@ -138,6 +158,10 @@ public:
         case LiketrainEventType::SwitchStateChange:
             deser.read(data.switch_state_change.swtich_id);
             data.switch_state_change.state = static_cast<SwitchState>(deser.read_u8());
+            break;
+        case LiketrainEventType::SectionPowerChange:
+            data.section_power_change.section_id = deser.read_u32();
+            data.section_power_change.power = static_cast<SectionPower>(deser.read_u8());
             break;
         case LiketrainEventType::Slaves:
             data.slaves.n_slaves = deser.read_u32();
