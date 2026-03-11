@@ -14,7 +14,36 @@ enum class SwitchState : uint8_t
     Right = 1
 };
 
-#define SWITCH_MASTER_TOGGLE_TIME 100 // ms to toggle the master switch when changing state
+#define SWITCH_MASTER_TOGGLE_TIME 200 // ms to toggle the master switch when changing state
+
+class Switch {
+private:
+    SwitchId switch_id;
+    Relais relais;
+
+public:
+    Switch(SwitchId switch_id, Relais relais): relais(relais)  {
+        memccpy(this->switch_id, switch_id, 0, SWITCH_ID_LEN);
+    }
+
+    Switch(const char* switch_id_str, Relais relais): relais(relais) {
+        strncpy((char*)this->switch_id, switch_id_str, SWITCH_ID_LEN);
+    }
+
+    inline void init() { relais.init(); }
+
+    inline const SwitchId* id() const { return &switch_id; }
+    inline void set_state(SwitchState state) {
+        switch (state) {
+            case SwitchState::Left:
+                relais.on();
+                break;
+            case SwitchState::Right:
+                relais.off();
+                break;
+        }
+    }
+};
 
 enum class SwitchMasterToggleState : uint8_t
 {
@@ -41,6 +70,8 @@ public:
 
     /// @brief Toggle the switch if it is armed, and disarm it. Call this in the main loop
     void update();
+
+    void blocking_toggle();
 };
 
 #endif // SWITCH_H

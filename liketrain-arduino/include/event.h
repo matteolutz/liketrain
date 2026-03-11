@@ -1,6 +1,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
+#include "section_power.h"
 #include "deser.h"
 #include "switch.h"
 

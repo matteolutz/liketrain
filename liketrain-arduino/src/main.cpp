@@ -24,8 +24,6 @@ Queue<LiketrainCommand> slave_relay(32);
 
 #ifdef IS_MASTER
 DeserSerial usb_serial(Serial);
-
-SwitchMaster switch_master(Relais(2));
 #endif
 
 // Whether to send an ACK response to the host after processing the next command.
@@ -62,7 +60,13 @@ void setup()
     delay(100);
   }
 
-  // TODO: init sections
+  for (Section &section : sections) {
+    section.init();
+  }
+
+  for (Switch &sw : switches) {
+    sw.init();
+  }
 
 #ifdef IS_MASTER
   switch_master.init();
@@ -71,6 +75,22 @@ void setup()
 #endif
 
   rs485_serial.init();
+
+#ifdef SWITCH_TEST
+  delay(2000);
+
+  for (Switch &sw : switches) {
+    sw.set_state(SwitchState::Left);
+    delay(100);
+    switch_master.blocking_toggle();
+    delay(2000);
+
+    sw.set_state(SwitchState::Right);
+    delay(100);
+    switch_master.blocking_toggle();
+    delay(5000);
+  }
+#endif
 }
 
 void loop()

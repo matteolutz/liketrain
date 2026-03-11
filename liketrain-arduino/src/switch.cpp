@@ -30,3 +30,9 @@ void SwitchMaster::update()
         break;
     }
 }
+
+void SwitchMaster::blocking_toggle() {
+    master_relais.on();
+    delay(SWITCH_MASTER_TOGGLE_TIME);
+    master_relais.off();
+}

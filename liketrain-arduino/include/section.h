@@ -6,17 +6,9 @@
 #include "relais.h"
 #include "queue.h"
 #include "event.h"
+#include "section_power.h"
 
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
-
-enum class SectionPower : uint8_t
-{
-    Off = 0,
-    Quarter = 1,
-    Half = 2,
-    ThreeQuarters = 3,
-    Full = 4
-};
 
 class SectionPowerRelais
 {
