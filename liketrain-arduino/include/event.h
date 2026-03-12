@@ -84,7 +84,7 @@ public:
         return event;
     }
 
-    static LiketrainEvent section_event(uint32_t section_id, SectionPower power)
+    static LiketrainEvent section_power_change(uint32_t section_id, SectionPower power)
     {
         LiketrainEvent event;
         event.type = LiketrainEventType::SectionPowerChange;

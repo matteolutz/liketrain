@@ -19,7 +19,7 @@ DeserBufferSerializer<128> ser;
 RS485 rs485(Serial1, 52, 53);
 DeserSerial rs485_serial(rs485);
 
-Queue<LiketrainEvent> events(32);
+Queue<LiketrainEvent> events(64);
 Queue<LiketrainCommand> slave_relay(32);
 
 #ifdef IS_MASTER
@@ -60,11 +60,13 @@ void setup()
     delay(100);
   }
 
-  for (Section &section : sections) {
+  for (Section &section : sections)
+  {
     section.init();
   }
 
-  for (Switch &sw : switches) {
+  for (Switch &sw : switches)
+  {
     sw.init();
   }
 
@@ -79,7 +81,8 @@ void setup()
 #ifdef SWITCH_TEST
   delay(2000);
 
-  for (Switch &sw : switches) {
+  for (Switch &sw : switches)
+  {
     sw.set_state(SwitchState::Left);
     delay(100);
     switch_master.blocking_toggle();
@@ -101,6 +104,12 @@ void loop()
   read_master_commands();
 #endif
 
+  // update the sections
+  for (Section &section : sections)
+  {
+    section.update(events);
+  }
+
 #ifdef IS_MASTER
   poll_slaves();
 
@@ -108,8 +117,6 @@ void loop()
   // toggle it, which will cause it to change the switch state
   switch_master.update();
 #endif
-
-  // TODO: update sections
 
 #ifdef IS_MASTER
   handle_events();
@@ -288,13 +295,12 @@ bool handle_command(LiketrainCommand &cmd)
 {
   switch (cmd.type)
   {
+  case LiketrainCommandType::Invalid:
+    break;
   case LiketrainCommandType::Ping:
   {
     if (slave_id.get() != cmd.data.ping.slave_id)
-    {
-      // not for me
-      return false;
-    }
+      return false; // not for me
 
     auto pong_event = LiketrainEvent::pong(cmd.data.ping.slave_id, cmd.data.ping.seq);
     events.enqueue(pong_event);
@@ -304,15 +310,62 @@ bool handle_command(LiketrainCommand &cmd)
   case LiketrainCommandType::GetSlaves:
   {
     if (!slave_id.is_master())
-    {
-      // slaves should not receive this command
-      return false;
-    }
+      return false; // slaves should not receive this command
 
     auto slave_event = LiketrainEvent::slaves(SLAVE_COUNT);
     events.enqueue(slave_event);
 
     return true;
+  }
+  case LiketrainCommandType::SetSectionPower:
+  {
+    for (Section &section : sections)
+    {
+      if (section.id() != cmd.data.set_section_power.section_id)
+        continue;
+
+      // we found the section
+      section.set_power(cmd.data.set_section_power.power);
+
+      events.enqueue(
+          LiketrainEvent::section_power_change(
+              cmd.data.set_section_power.section_id,
+              cmd.data.set_section_power.power));
+
+      return true; // we handled this section, don't send cmd to slaves
+    }
+  }
+  case LiketrainCommandType::SetSwitchState:
+  {
+    for (Switch &sw : switches)
+    {
+      if (!sw.matches_id(cmd.data.set_switch_state.switch_id))
+        continue;
+
+      // we found the switch
+      sw.set_state(cmd.data.set_switch_state.state);
+
+      events.enqueue(
+          LiketrainEvent::switch_state_change(
+              cmd.data.set_switch_state.switch_id,
+              cmd.data.set_switch_state.state));
+
+      return true; // we handled this switch, don't send to slaves
+    }
+  }
+  case LiketrainCommandType::ResetAll:
+  {
+    for (Section &section : sections)
+    {
+      section.reset();
+    }
+
+    for (Switch &sw : switches)
+    {
+      sw.reset();
+    }
+
+    // don't return true, so the ResetAll command will be relayed to the slaves, which will cause them to reset as well
   }
   }
 

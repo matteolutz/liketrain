@@ -8,6 +8,8 @@
 #include "event.h"
 #include "section_power.h"
 
+#include "ACS712.h"
+
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
 
 class SectionPowerRelais
@@ -32,6 +34,8 @@ private:
         case SectionPower::Full:
             return &relais[3];
         }
+
+        return nullptr;
     }
 
 public:
@@ -80,12 +84,12 @@ private:
     uint8_t section_id;
 
     SectionPowerRelais power_relais;
-    uint8_t train_detection_pin;
+    ACS712 train_detection;
 
     bool is_occupied = false;
 
 public:
-    Section(uint8_t section_id, SectionPowerRelais relais, uint8_t train_detection_pin);
+    Section(uint8_t section_id, SectionPowerRelais relais, ACS712 train_detection);
 
     void init();
 
@@ -94,9 +98,15 @@ public:
     SectionPower current_power() const { return power_relais.get_current_power(); }
     void set_power(SectionPower power) { power_relais.set_power(power); }
 
+    uint8_t id() const { return section_id; }
+
     void reset()
     {
         set_power(SectionPower::Off);
+
+        // not setting this to false would cause a SectionFree event
+        // being enqueued when the next ACS value is read
+        is_occupied = false;
     }
 
     void update(Queue<LiketrainEvent> &events);

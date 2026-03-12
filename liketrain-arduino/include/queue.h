@@ -10,6 +10,8 @@ private:
     T *buffer;
     size_t buffer_size;
 
+    bool should_free_buffer = false;
+
     size_t head = 0;
     size_t tail = 0;
     size_t count = 0;
@@ -22,7 +24,13 @@ public:
 
     /// @brief Creates a queue with a new heap allocated buffer of the given size.
     /// @param buffer_size
-    Queue(size_t buffer_size) : buffer(new T[buffer_size]), buffer_size(buffer_size) {}
+    Queue(size_t buffer_size) : buffer(new T[buffer_size]), buffer_size(buffer_size), should_free_buffer(true) {}
+
+    ~Queue()
+    {
+        if (should_free_buffer)
+            delete[] buffer;
+    }
 
     bool enqueue(T byte)
     {

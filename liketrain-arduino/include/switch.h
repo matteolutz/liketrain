@@ -16,33 +16,42 @@ enum class SwitchState : uint8_t
 
 #define SWITCH_MASTER_TOGGLE_TIME 200 // ms to toggle the master switch when changing state
 
-class Switch {
+class Switch
+{
 private:
     SwitchId switch_id;
     Relais relais;
 
 public:
-    Switch(SwitchId switch_id, Relais relais): relais(relais)  {
+    Switch(SwitchId switch_id, Relais relais) : relais(relais)
+    {
         memccpy(this->switch_id, switch_id, 0, SWITCH_ID_LEN);
     }
 
-    Switch(const char* switch_id_str, Relais relais): relais(relais) {
-        strncpy((char*)this->switch_id, switch_id_str, SWITCH_ID_LEN);
+    Switch(const char *switch_id_str, Relais relais) : relais(relais)
+    {
+        strncpy((char *)this->switch_id, switch_id_str, SWITCH_ID_LEN);
     }
 
     inline void init() { relais.init(); }
 
-    inline const SwitchId* id() const { return &switch_id; }
-    inline void set_state(SwitchState state) {
-        switch (state) {
-            case SwitchState::Left:
-                relais.on();
-                break;
-            case SwitchState::Right:
-                relais.off();
-                break;
+    inline const SwitchId *id() const { return &switch_id; }
+    inline bool matches_id(const SwitchId &other_id) const { return memcmp(switch_id, other_id, SWITCH_ID_LEN) == 0; }
+
+    inline void set_state(SwitchState state)
+    {
+        switch (state)
+        {
+        case SwitchState::Left:
+            relais.on();
+            break;
+        case SwitchState::Right:
+            relais.off();
+            break;
         }
     }
+
+    inline void reset() { set_state(SwitchState::Left); }
 };
 
 enum class SwitchMasterToggleState : uint8_t

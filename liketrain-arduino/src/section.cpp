@@ -1,19 +1,25 @@
 #include "section.h"
 
-Section::Section(uint8_t section_id, SectionPowerRelais relais, uint8_t train_detection_pin)
-    : section_id(section_id), power_relais(relais), train_detection_pin(train_detection_pin)
+Section::Section(uint8_t section_id, SectionPowerRelais relais, ACS712 train_detection)
+    : section_id(section_id), power_relais(relais), train_detection(train_detection)
 {
 }
 
 void Section::init()
 {
     power_relais.init();
-    pinMode(train_detection_pin, INPUT);
+    train_detection.begin();
 }
 
 void Section::update(Queue<LiketrainEvent> &events)
 {
-    bool occupied = digitalRead(train_detection_pin) == HIGH;
+    train_detection.update();
+
+    // no rms value available yet, skip
+    if (!train_detection.available())
+        return;
+
+    bool occupied = train_detection.get_rms() > 0.1;
 
     if (occupied == is_occupied)
         return;

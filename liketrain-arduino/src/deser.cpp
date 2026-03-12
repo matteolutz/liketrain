@@ -43,6 +43,8 @@ int DeserSerial::serial_available()
     case DeserSerialSerialImplementation::RS485:
         return rs485->available();
     }
+
+    return 0;
 }
 
 int DeserSerial::serial_read_byte()
@@ -54,6 +56,8 @@ int DeserSerial::serial_read_byte()
     case DeserSerialSerialImplementation::RS485:
         return rs485->read();
     }
+
+    return 0;
 }
 
 size_t DeserSerial::serial_read_bytes(uint8_t *buffer, size_t max_size)
@@ -65,6 +69,8 @@ size_t DeserSerial::serial_read_bytes(uint8_t *buffer, size_t max_size)
     case DeserSerialSerialImplementation::RS485:
         return rs485->readBytes(buffer, max_size);
     }
+
+    return 0;
 }
 
 size_t DeserSerial::serial_write_bytes(const uint8_t *buffer, size_t size)
@@ -76,6 +82,8 @@ size_t DeserSerial::serial_write_bytes(const uint8_t *buffer, size_t size)
     case DeserSerialSerialImplementation::RS485:
         return rs485->write(buffer, size);
     }
+
+    return 0;
 }
 
 size_t DeserSerial::serial_write_byte(uint8_t byte)
@@ -87,6 +95,8 @@ size_t DeserSerial::serial_write_byte(uint8_t byte)
     case DeserSerialSerialImplementation::RS485:
         return rs485->write(byte);
     }
+
+    return 0;
 }
 
 void DeserSerial::serial_flush()
