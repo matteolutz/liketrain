@@ -1,10 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// This file contains the compile configuration for uploading this code to the chip.
+//     Master   -> Arduino 3
+//     Slave 1  -> Arduino 2
+//     Slave 2  -> Arduino 1
+
 #include "slave.h"
 
-// #define SLAVE_ID 1
-#define SLAVE_COUNT 1
+// #define SLAVE_ID 2
+#define SLAVE_COUNT 2
 
 #define SWITCH_TEST
 

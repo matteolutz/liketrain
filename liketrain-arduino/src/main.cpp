@@ -79,6 +79,7 @@ void setup()
   rs485_serial.init();
 
 #ifdef SWITCH_TEST
+#ifdef IS_MASTER
   delay(2000);
 
   for (Switch &sw : switches)
@@ -93,6 +94,7 @@ void setup()
     switch_master.blocking_toggle();
     delay(5000);
   }
+#endif
 #endif
 }
 
