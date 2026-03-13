@@ -15,4 +15,7 @@ pub enum TrackError {
 
     #[error("The switch with id {0} already exists")]
     SwitchAlreadyExists(SwitchId),
+
+    #[error("There was no geometry found for the section with id {0}")]
+    SectionGeometryNotFound(SectionId),
 }

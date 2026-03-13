@@ -1,0 +1,28 @@
+{
+  "sections": {
+    "S1": { "length": 118.5 },
+    "S2": { "length": 15.7 },
+    "S3": { "length": 114.1 },
+    "S4": { "length": 54.8 },
+    "S5": { "length": 110.8 },
+    "S6": { "length": 57.9 },
+    "S7": { "length": 62.6 },
+    "S8": { "length": 121.1 },
+    "S9": { "length": 54.8 },
+    "S10": { "length": 146.6 },
+    "S11": { "length": 71.5 },
+    "S12": { "length": 71.9 },
+    "S13": { "length": 122.9 },
+    "S14": { "length": 15.1 },
+    "S15": { "length": 97.0 },
+    "S16": { "length": 135.3 },
+
+    "S20": { "length": 64.9 },
+    "S21": { "length": 127.9 },
+    "S22": { "length": 64.5 },
+    "S23": { "length": 47.3 },
+    "S24": { "length": 88.3 },
+    "S25": { "length": 70.2 },
+    "S26": { "length": 45.5 }
+  }
+}

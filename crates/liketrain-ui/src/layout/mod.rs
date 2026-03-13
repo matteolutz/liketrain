@@ -5,7 +5,7 @@ use gpui::{
     PathBuilder, Pixels, Point, Render, ScrollWheelEvent, Styled, Window, canvas, div, point, px,
 };
 use liketrain_core::{SectionId, SwitchId, Track};
-use serde::{Deserialize, Serialize, de::Visitor};
+use serde::{Deserialize, Serialize};
 use vek::Vec2;
 
 use crate::{
@@ -24,64 +24,6 @@ mod switch;
 mod vec;
 
 const SECTION_STROKE_WIDTH: f32 = 1.0;
-
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LayoutSectionId(SectionId);
-
-impl From<SectionId> for LayoutSectionId {
-    fn from(id: SectionId) -> Self {
-        LayoutSectionId(id)
-    }
-}
-
-impl From<LayoutSectionId> for SectionId {
-    fn from(id: LayoutSectionId) -> Self {
-        id.0
-    }
-}
-
-impl Serialize for LayoutSectionId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let formatted = format!("S{}", self.0);
-        serializer.serialize_str(&formatted)
-    }
-}
-
-impl<'de> Deserialize<'de> for LayoutSectionId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct LayoutSectionIdVisitor;
-
-        impl<'de> Visitor<'de> for LayoutSectionIdVisitor {
-            type Value = LayoutSectionId;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a string in the format \"S<usize>\"")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if let Some(id_str) = v.strip_prefix("S") {
-                    let id = id_str
-                        .parse::<usize>()
-                        .map_err(|_| E::custom("invalid number in section id"))?;
-                    Ok(LayoutSectionId(id.into()))
-                } else {
-                    Err(E::custom("section id must start with 'S'"))
-                }
-            }
-        }
-
-        deserializer.deserialize_str(LayoutSectionIdVisitor)
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutSectionGeometry {
@@ -235,7 +177,7 @@ impl LayoutSection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Layout {
-    sections: HashMap<LayoutSectionId, LayoutSection>,
+    sections: HashMap<SectionId, LayoutSection>,
 }
 
 #[derive(Debug, Clone)]

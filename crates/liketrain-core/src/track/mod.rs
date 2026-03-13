@@ -15,15 +15,24 @@ pub use transition::*;
 mod error;
 pub use error::*;
 
+mod geo;
+pub use geo::*;
+
 use crate::Direction;
 
 #[derive(Debug, Default)]
 pub struct Track {
     sections: HashMap<SectionId, Section>,
     switches: HashMap<SwitchId, Switch>,
+
+    geometry: TrackGeometry,
 }
 
 impl Track {
+    pub fn set_geometry(&mut self, geometry: impl Into<TrackGeometry>) {
+        self.geometry = geometry.into();
+    }
+
     pub fn section_ids(&self) -> impl Iterator<Item = SectionId> {
         self.sections.keys().copied()
     }
@@ -34,6 +43,10 @@ impl Track {
 
     pub fn section(&self, section_id: &SectionId) -> Option<&Section> {
         self.sections.get(section_id)
+    }
+
+    pub fn section_geo(&self, section_id: &SectionId) -> Option<&TrackSectionGeometry> {
+        self.geometry.section(section_id)
     }
 
     pub fn section_mut(&mut self, section_id: &SectionId) -> Option<&mut Section> {

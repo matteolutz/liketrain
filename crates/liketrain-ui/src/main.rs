@@ -3,7 +3,7 @@ use std::rc::Rc;
 use gpui::{
     App, Bounds, Context, Entity, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
-use liketrain_core::{Track, parser::Parser};
+use liketrain_core::{Track, TrackGeometry, parser::Parser};
 
 use crate::{
     ebula::{Ebula, EbulaTheme},
@@ -48,11 +48,16 @@ fn main() {
     init_logger();
 
     let track_dsl = include_str!("../../../resources/track.ltt");
+    let track_geo = include_str!("../../../resources/geo.json");
 
     let track_defs = liketrain_core::parser::parser().parse(track_dsl).unwrap();
+    let track_geo: TrackGeometry = serde_json::from_str(track_geo).unwrap();
 
     let evaluator = liketrain_core::parser::eval::Evaluator::default();
-    let track = evaluator.evaluate(track_defs).unwrap();
+
+    let mut track = evaluator.evaluate(track_defs).unwrap();
+    track.set_geometry(track_geo);
+
     let track = Rc::new(track);
 
     let layout_json = include_str!("../../../resources/layout.json");

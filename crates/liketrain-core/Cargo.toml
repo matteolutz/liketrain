@@ -11,6 +11,9 @@ liketrain-hardware = { path = "../liketrain-hardware" }
 serialport = "4.8.1"
 crossbeam = "0.8.4"
 
+serde.workspace = true
+serde_json.workspace = true
+
 itertools.workspace = true
 log.workspace = true
 

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize, de::Visitor};
+
 use crate::{Connection, Direction};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -66,6 +68,49 @@ impl From<usize> for SectionId {
 impl From<u32> for SectionId {
     fn from(id: u32) -> Self {
         SectionId(id as usize)
+    }
+}
+
+impl Serialize for SectionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let formatted = format!("S{}", self.0);
+        serializer.serialize_str(&formatted)
+    }
+}
+
+impl<'de> Deserialize<'de> for SectionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct SectionIdVisitor;
+
+        impl<'de> Visitor<'de> for SectionIdVisitor {
+            type Value = SectionId;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string in the format \"S<usize>\"")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if let Some(id_str) = v.strip_prefix("S") {
+                    let id = id_str
+                        .parse::<usize>()
+                        .map_err(|_| E::custom("invalid number in section id"))?;
+                    Ok(SectionId(id.into()))
+                } else {
+                    Err(E::custom("section id must start with 'S'"))
+                }
+            }
+        }
+
+        deserializer.deserialize_str(SectionIdVisitor)
     }
 }
 
