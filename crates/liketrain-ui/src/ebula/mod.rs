@@ -281,6 +281,7 @@ impl Render for Ebula {
             .flex_col()
             .bg(self.theme.background)
             .text_color(self.theme.foreground)
+            .font_family("Arial")
             .overflow_y_hidden()
             .child(self.render_header(window, cx))
             .child(self.render_upcoming(window, cx))
