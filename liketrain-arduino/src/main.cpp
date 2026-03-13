@@ -49,7 +49,7 @@ bool handle_command(LiketrainCommand &cmd);
 
 void setup()
 {
-  panic_init();
+  panic_init(LED_BUILTIN);
 
   pinMode(LED_BUILTIN, OUTPUT);
   for (int i = 0; i < 3; i++)
