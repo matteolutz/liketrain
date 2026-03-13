@@ -243,9 +243,8 @@ void send_ack_to_host()
 
   usb_serial.write_frame(ser);
 }
-#endif
 
-#ifndef IS_MASTER
+#else
 void read_master_commands()
 {
   rs485_serial.update();
