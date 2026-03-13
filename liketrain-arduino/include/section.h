@@ -10,13 +10,35 @@
 
 #include "ACS712.h"
 
+// the delay in ms, when switching from one power level to anohter
+// (not used when switching to or from Off)
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
+
+// the minimum train detection sensor RMS value to consider the section occupied
+#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.1
+
+enum class SectionPowerRelaisSwitchingState
+{
+    Idle,
+    DelayedSwitching
+};
 
 class SectionPowerRelais
 {
 private:
     Relais relais[4];
     SectionPower current_power = SectionPower::Off;
+
+    SectionPowerRelaisSwitchingState switching_state = SectionPowerRelaisSwitchingState::Idle;
+    SectionPower switching_target_power = SectionPower::Off;
+    unsigned long switching_start_time = 0;
+
+    void reset_switching_state()
+    {
+        switching_state = SectionPowerRelaisSwitchingState::Idle;
+        switching_target_power = SectionPower::Off;
+        switching_start_time = 0;
+    }
 
 private:
     Relais *power_to_relais(SectionPower power)
@@ -49,6 +71,24 @@ public:
         }
     }
 
+    void update()
+    {
+        if (switching_state == SectionPowerRelaisSwitchingState::Idle) 
+            return; // we are not in the middle of switching, nothing to do
+
+        unsigned long now = millis();
+
+        if (now - switching_start_time < SECTION_POWER_RELAIS_SWITCHING_DELAY)
+            return; // we are still in the delay period, wait a bit more
+
+        // power on the new relais
+        if (switching_target_power != SectionPower::Off)
+            power_to_relais(switching_target_power)->on(); // this shouldn't happen, when switching to off, we can do it directly
+        current_power = switching_target_power;
+
+        reset_switching_state();
+    }
+
     SectionPower get_current_power() const { return current_power; }
 
     void set_power(SectionPower power)
@@ -56,25 +96,32 @@ public:
         if (power == current_power)
             return;
 
-        auto previous_power = current_power;
-        current_power = power;
+        // cancel the current switching to prevent any race conditions
+        reset_switching_state();
 
-        if (previous_power != SectionPower::Off)
-        {
-            // we need to turn of the previous power level relais
-            power_to_relais(previous_power)->off();
-
-            // if we need to power up a different relais, delay
-            if (power != SectionPower::Off)
-            {
-                delay(SECTION_POWER_RELAIS_SWITCHING_DELAY);
-            }
-        }
-
-        if (power != SectionPower::Off)
+        // when switching from off to any other power level, we can directly power on the new relais without delay
+        if (current_power == SectionPower::Off)
         {
             power_to_relais(power)->on();
+            current_power = power;
+            return;
         }
+
+        // power off the current relais
+        power_to_relais(current_power)->off();
+
+        // when we are switching to off, we are done
+        if (power == SectionPower::Off)
+        {
+            current_power = power;
+            return;
+        }
+
+        // the only remaining case is switching from one power level to another,
+        // in which case we need to delay the switching
+        switching_state = SectionPowerRelaisSwitchingState::DelayedSwitching;
+        switching_target_power = power;
+        switching_start_time = millis();
     }
 };
 
@@ -87,6 +134,8 @@ private:
     ACS712 train_detection;
 
     bool is_occupied = false;
+
+    void update_train_detection(Queue<LiketrainEvent> &events);
 
 public:
     Section(uint8_t section_id, SectionPowerRelais relais, ACS712 train_detection);

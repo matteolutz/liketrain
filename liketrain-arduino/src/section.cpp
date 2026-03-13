@@ -11,18 +11,18 @@ void Section::init()
     train_detection.begin();
 }
 
-void Section::update(Queue<LiketrainEvent> &events)
+void Section::update_train_detection(Queue<LiketrainEvent> &events)
 {
-    train_detection.update();
+    train_detection.update(); // get a new sample for the train detection sensor
 
     // no rms value available yet, skip
     if (!train_detection.available())
         return;
 
-    bool occupied = train_detection.get_rms() > 0.1;
+    bool occupied = train_detection.get_rms() > SECTION_TRAIN_DETECTION_RMS_THRESHOLD;
 
     if (occupied == is_occupied)
-        return;
+        return; // state hasn't changed
 
     is_occupied = occupied;
 
@@ -36,4 +36,11 @@ void Section::update(Queue<LiketrainEvent> &events)
         auto event = LiketrainEvent::section_event(section_id, SectionEventType::Freed);
         events.enqueue(event);
     }
+}
+
+void Section::update(Queue<LiketrainEvent> &events)
+{
+    power_relais.update(); // update the relais (necessary if we are doing a non-blocking delayed power change)
+
+    update_train_detection(events);
 }
