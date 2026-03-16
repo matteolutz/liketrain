@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{rc::Rc, time::Duration};
 
 use gpui::{
     Context, Div, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels, Render,
@@ -7,6 +7,7 @@ use gpui::{
 };
 
 mod theme;
+use liketrain_core::{Track, Train};
 pub use theme::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -24,6 +25,9 @@ enum BorderSide {
 pub struct Ebula {
     theme: EbulaTheme,
 
+    track: Rc<Track>,
+    train: Train,
+
     content_scroll_handle: ScrollHandle,
 
     _task: Task<()>,
@@ -37,7 +41,7 @@ impl Ebula {
 }
 
 impl Ebula {
-    pub fn new(theme: EbulaTheme, cx: &mut Context<Self>) -> Self {
+    pub fn new(track: Rc<Track>, train: Train, theme: EbulaTheme, cx: &mut Context<Self>) -> Self {
         let _task = cx.spawn(async |this, cx| {
             loop {
                 let now = chrono::Local::now();
@@ -55,6 +59,8 @@ impl Ebula {
         content_scroll_handle.scroll_to_bottom();
 
         Self {
+            track,
+            train,
             theme,
             content_scroll_handle,
             _task,
@@ -111,7 +117,7 @@ impl Ebula {
 
     fn km_field(&self, km: f32, border: BorderSide) -> Div {
         let km_int = km.trunc() as u32;
-        let km_frac = (km.fract() * 10.0) as u32;
+        let km_frac = (km.fract() * 100.0) as u32;
 
         div()
             .px_2()
@@ -122,7 +128,12 @@ impl Ebula {
             .items_end()
             .font_weight(FontWeight::SEMIBOLD)
             .child(div().text_sm().child(format!("{}", km_int)))
-            .child(div().text_xs().pb(px(1.0)).child(format!(",{}", km_frac)))
+            .child(
+                div()
+                    .text_xs()
+                    .pb(px(1.0))
+                    .child(format!(",{:02}", km_frac)),
+            )
     }
 
     fn time_field(&self, hour: u32, minute: u32, second: u32, border: BorderSide) -> Div {
@@ -220,8 +231,8 @@ impl Ebula {
                             .flex()
                             .flex_col_reverse()
                             // .overflow_y_scrollbar()
-                            .children((50..=100).map(|i| {
-                                let km = i as f32 / 5.0; // 0.2, 0.4, ..
+                            .children((0..=100).map(|i| {
+                                let km = i as f32 / 4.0; // 0.2, 0.4, ..
 
                                 div()
                                     .w_full()

@@ -38,9 +38,9 @@ pub struct Train {
 }
 
 impl Train {
-    pub fn from_route(name: String, route: Route) -> Self {
+    pub fn from_route(name: impl Into<String>, route: Route) -> Self {
         Self {
-            name,
+            name: name.into(),
             mode: route.into(),
         }
     }

@@ -1,10 +1,9 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, Bounds, Context, Entity, SharedString, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size,
+    App, Bounds, Context, Entity, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
-use liketrain_core::{Track, TrackGeometry, parser::Parser};
+use liketrain_core::{Direction, Route, Track, TrackGeometry, Train, parser::Parser};
 
 use crate::{
     ebula::{Ebula, EbulaTheme},
@@ -16,41 +15,6 @@ mod assets;
 mod ebula;
 mod layout;
 mod ui;
-
-struct HelloWorld2 {
-    text: SharedString,
-}
-
-impl Render for HelloWorld2 {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .bg(rgb(0x505050))
-            .size(px(500.0))
-            .justify_center()
-            .items_center()
-            .shadow_lg()
-            .border_1()
-            .border_color(rgb(0x0000ff))
-            .text_xl()
-            .text_color(rgb(0xffffff))
-            .child(format!("Hello, {}!", &self.text))
-            .font_family("JetBrains Mono")
-            .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(div().size_8().bg(gpui::red()))
-                    .child(div().size_8().bg(gpui::green()))
-                    .child(div().size_8().bg(gpui::blue()))
-                    .child(div().size_8().bg(gpui::yellow()))
-                    .child(div().size_8().bg(gpui::black()))
-                    .child(div().size_8().bg(gpui::white())),
-            )
-    }
-}
 
 struct HelloWorld {
     renderer: Entity<LayoutRenderer>,
@@ -104,9 +68,12 @@ fn main() {
 
     log::info!("layout: {:#?}", resolved_layout);
 
+    let test_route = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track).unwrap();
+    let test_train = Train::from_route("RE5", test_route);
+
     gpui_platform::application()
         .with_assets(assets::Assets)
-        .run(|cx: &mut App| {
+        .run(move |cx: &mut App| {
             assets::init(cx).unwrap();
             log::debug!("fonts: {:#?}", cx.text_system().all_font_names());
 
@@ -118,22 +85,7 @@ fn main() {
                 },
                 |window, cx| {
                     window.set_window_title("liketrain");
-                    cx.new(|cx| HelloWorld::new(track, resolved_layout, cx))
-                },
-            )
-            .unwrap();
-
-            let bounds = Bounds::centered(None, size(px(500.), px(500.0)), cx);
-            cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..Default::default()
-                },
-                |window, cx| {
-                    window.set_window_title("liketrain Test");
-                    cx.new(|cx| HelloWorld2 {
-                        text: "liketrain".into(),
-                    })
+                    cx.new(|cx| HelloWorld::new(track.clone(), resolved_layout, cx))
                 },
             )
             .unwrap();
@@ -146,7 +98,9 @@ fn main() {
                 },
                 |window, cx| {
                     window.set_window_title("liketrain - EBuLa");
-                    cx.new(|cx| Ebula::new(EbulaTheme::default_light(), cx))
+                    cx.new(|cx| {
+                        Ebula::new(track.clone(), test_train, EbulaTheme::default_light(), cx)
+                    })
                 },
             )
             .unwrap();

@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::SectionId;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TrackSectionWaypoint {}
+pub struct TrackSectionWaypoint {
+    /// The distance along the section in meters (going forward)
+    pub at_meter: f32,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TrackSectionGeometry {
