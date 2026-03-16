@@ -68,8 +68,8 @@ fn main() {
 
     log::info!("layout: {:#?}", resolved_layout);
 
-    let test_route = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track).unwrap();
-    let test_train = Train::from_route("RE5", test_route);
+    let test_route = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track).unwrap();
+    let test_train = Train::from_route("4218", test_route);
 
     gpui_platform::application()
         .with_assets(assets::Assets)

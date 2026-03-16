@@ -47,6 +47,14 @@ impl Train {
 }
 
 impl Train {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn driving_mode(&self) -> &TrainDrivingMode {
+        &self.mode
+    }
+
     pub fn get_initial_section(&self) -> Option<SectionId> {
         self.mode.get_initial_section()
     }

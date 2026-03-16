@@ -53,7 +53,7 @@ fn test_route_validation() {
     let eval = Evaluator::default();
     let track = eval.evaluate(track_defs).unwrap();
 
-    let Some(r1) = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track) else {
+    let Some(r1) = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track) else {
         assert!(false, "Route 1 failed");
         return;
     };
@@ -61,6 +61,7 @@ fn test_route_validation() {
     println!("Route 1 valid: {}", r1.pretty_print(&track));
 
     let Some(r2) = Route::new(
+        "RE5",
         [24_usize, 22, 8, 3, 9, 10, 11, 13, 25, 23],
         Direction::Forward,
         &track,
@@ -91,7 +92,7 @@ fn test_controller() {
     let eval = Evaluator::default();
     let track = eval.evaluate(track_defs).unwrap();
 
-    let Some(r1) = Route::new([24_usize, 22, 21, 24], Direction::Forward, &track) else {
+    let Some(r1) = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track) else {
         assert!(false, "Route 1 failed");
         return;
     };
@@ -102,7 +103,7 @@ fn test_controller() {
 
     let controller_config = ControllerConfig {
         track,
-        trains: [(1_u32.into(), Train::from_route("RE5".into(), r1))].into(),
+        trains: [(1_u32.into(), Train::from_route("RE5", r1))].into(),
     };
 
     let (tx, _) = mpsc::channel();

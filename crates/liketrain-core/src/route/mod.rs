@@ -7,19 +7,28 @@ pub struct Route {
     vias: Vec<SectionId>,
     starting_direction: Direction,
 
+    name: String,
+
     transitions: Vec<SectionTransition>,
 }
 
 impl Route {
-    pub fn new<I, S>(vias: I, starting_direction: Direction, track: &Track) -> Option<Self>
+    pub fn new<I, S>(
+        name: impl Into<String>,
+        vias: I,
+        starting_direction: Direction,
+        track: &Track,
+    ) -> Option<Self>
     where
         I: IntoIterator<Item = S>,
         S: Into<SectionId>,
     {
         let vias: Vec<SectionId> = vias.into_iter().map_into().collect();
         let transitions = Self::build_transitions(&vias, starting_direction, track)?;
+        let name = name.into();
 
         Some(Self {
+            name,
             vias,
             starting_direction,
             transitions,
@@ -62,6 +71,10 @@ impl Route {
         Some(route_transitions)
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn starting_direction(&self) -> Direction {
         self.starting_direction
     }
@@ -80,6 +93,14 @@ impl Route {
         }
 
         self.vias.get(idx).copied()
+    }
+
+    pub fn vias(&self) -> &[SectionId] {
+        &self.vias
+    }
+
+    pub fn vias_with_transition(&self) -> impl Iterator<Item = (SectionId, &SectionTransition)> {
+        self.vias.iter().copied().zip(self.transitions.iter())
     }
 
     pub fn pretty_print(&self, track: &Track) -> String {
