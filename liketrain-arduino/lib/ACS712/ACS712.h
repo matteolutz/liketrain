@@ -22,7 +22,7 @@ public:
 
 private:
     static const uint16_t SAMPLE_INTERVAL_MICROS = 1000;
-    static const uint16_t SAMPLE_COUNT = 200;
+    static const uint16_t SAMPLE_COUNT = 20;
 
     uint8_t pin;
 

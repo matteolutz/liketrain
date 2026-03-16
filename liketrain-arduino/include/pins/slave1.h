@@ -4,6 +4,11 @@
 #include "../section.h"
 #include "../switch.h"
 
+/* -------------------------------- RS485 -------------------------------- */
+#define RS485_SERIAL Serial1
+#define RS485_DE_PIN 23
+
+
 /* -------------------------------- Sections -------------------------------- */
 Section section12(
     12,

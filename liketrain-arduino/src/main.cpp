@@ -16,7 +16,7 @@
 DeserHeapBufferDeserializer deser;
 DeserBufferSerializer<128> ser;
 
-RS485 rs485(Serial1, 52, 53);
+RS485 rs485(RS485_SERIAL, RS485_DE_PIN);
 DeserSerial rs485_serial(rs485);
 
 Queue<LiketrainEvent> events(64);

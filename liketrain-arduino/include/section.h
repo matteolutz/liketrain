@@ -15,7 +15,7 @@
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
 
 // the minimum train detection sensor RMS value to consider the section occupied
-#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.1
+#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.179
 
 enum class SectionPowerRelaisSwitchingState
 {
@@ -91,6 +91,37 @@ public:
 
     SectionPower get_current_power() const { return current_power; }
 
+    void set_power_blocking(SectionPower power) {
+        if (power == current_power)
+            return;
+
+        // cancel the current switching to prevent any race conditions
+        reset_switching_state();
+
+        // when switching from off to any other power level, we can directly power on the new relais without delay
+        if (current_power == SectionPower::Off)
+        {
+            power_to_relais(power)->on();
+            current_power = power;
+            return;
+        }
+
+        // power off the current relais
+        power_to_relais(current_power)->off();
+
+        // when we are switching to off, we are done
+        if (power == SectionPower::Off)
+        {
+            current_power = power;
+            return;
+        }
+
+        delay(SECTION_POWER_RELAIS_SWITCHING_DELAY);
+
+        // power on the new relais
+        power_to_relais(power)->on();
+    }
+
     void set_power(SectionPower power)
     {
         if (power == current_power)
@@ -146,6 +177,7 @@ public:
 
     SectionPower current_power() const { return power_relais.get_current_power(); }
     void set_power(SectionPower power) { power_relais.set_power(power); }
+    void set_power_blocking(SectionPower power) { power_relais.set_power_blocking(power); }
 
     uint8_t id() const { return section_id; }
 

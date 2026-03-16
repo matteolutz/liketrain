@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    time::Duration,
+};
 
 use crate::{
     SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
@@ -452,7 +455,9 @@ impl Controller {
         log::debug!("getting slaves from master");
         ctx.exec(HardwareCommand::GetSlaves)?;
 
-        let HardwareEvent::Slaves { n_slaves } = ctx.event_rx.recv()? else {
+        let event = ctx.event_rx.recv()?;
+        let HardwareEvent::Slaves { n_slaves } = event else {
+            log::debug!("expected HardwareEvent::Slaves, got {:?}", event);
             return Err(ControllerError::ExpectedHardwareEvent(
                 HardwareEvent::Slaves { n_slaves: 0 },
             ));
@@ -529,6 +534,8 @@ impl Controller {
                 event_tx,
                 command_rx,
             })?;
+
+        std::thread::sleep(Duration::from_secs(2));
 
         let ctx = EventExecutionContext {
             command_tx: &command_tx,

@@ -92,14 +92,15 @@ fn test_controller() {
     let eval = Evaluator::default();
     let track = eval.evaluate(track_defs).unwrap();
 
-    let Some(r1) = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track) else {
+    let Some(r1) = Route::new("RE5", [16_usize, 14, 12, 10], Direction::Forward, &track) else {
         assert!(false, "Route 1 failed");
         return;
     };
 
     println!("Route 1 valid: {}", r1.pretty_print(&track));
 
-    let hardware_comm = SerialControllerHardwareCommunication::new("COM3", 115200);
+    let hardware_comm =
+        SerialControllerHardwareCommunication::new("/dev/tty.usbmodem11401", 115200);
 
     let controller_config = ControllerConfig {
         track,
