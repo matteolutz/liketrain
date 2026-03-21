@@ -3,6 +3,9 @@ use liketrain_hardware::{command::HardwareCommand, event::HardwareEvent};
 mod serial;
 pub use serial::*;
 
+// mod sim;
+// pub use sim::*;
+
 mod flow;
 
 use crate::ControllerError;

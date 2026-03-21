@@ -8,7 +8,9 @@ Section::Section(uint8_t section_id, SectionPowerRelais relais, ACS712 train_det
 void Section::init()
 {
     power_relais.init();
+
     train_detection.begin();
+    train_detection.calibrate();
 }
 
 void Section::update_train_detection(Queue<LiketrainEvent> &events)
@@ -19,7 +21,7 @@ void Section::update_train_detection(Queue<LiketrainEvent> &events)
     if (!train_detection.available())
         return;
 
-    bool occupied = train_detection.get_rms() > SECTION_TRAIN_DETECTION_RMS_THRESHOLD;
+    bool occupied = train_detection.get_rms() < SECTION_TRAIN_DETECTION_RMS_THRESHOLD;
 
     if (occupied == is_occupied)
         return; // state hasn't changed
@@ -40,7 +42,7 @@ void Section::update_train_detection(Queue<LiketrainEvent> &events)
 
 void Section::update(Queue<LiketrainEvent> &events)
 {
-    power_relais.update(); // update the relais (necessary if we are doing a non-blocking delayed power change)
-
     update_train_detection(events);
+
+    power_relais.update(); // update the relais (necessary if we are doing a non-blocking delayed power change)
 }

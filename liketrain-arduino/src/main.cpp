@@ -13,6 +13,9 @@
 
 #include "config.h"
 
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
 DeserHeapBufferDeserializer deser;
 DeserBufferSerializer<128> ser;
 
@@ -23,6 +26,10 @@ Queue<LiketrainEvent> events(64);
 Queue<LiketrainCommand> slave_relay(32);
 
 #ifdef IS_MASTER
+LiquidCrystal_I2C lcd(0x3F, 16, 2);
+unsigned long last_debug = millis();
+const unsigned long debug_interval = 700;
+
 DeserSerial usb_serial(Serial);
 #endif
 
@@ -60,17 +67,20 @@ void setup()
     delay(100);
   }
 
-  for (Section &section : sections)
+  for (Section *section : sections)
   {
-    section.init();
+    section->init();
   }
 
-  for (Switch &sw : switches)
+  for (Switch *sw : switches)
   {
-    sw.init();
+    sw->init();
   }
 
 #ifdef IS_MASTER
+  lcd.init();
+  lcd.backlight();
+
   switch_master.init();
 
   usb_serial.init();
@@ -107,10 +117,38 @@ void loop()
 #endif
 
   // update the sections
-  for (Section &section : sections)
+  /*for (Section* section : sections)
   {
-    section.update(events);
+    section->update(events);
+  }*/
+ section16.update(events);
+
+#ifdef IS_MASTER
+  if (millis() - last_debug >= debug_interval)
+  {
+    last_debug = millis();
+    /*lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(value);*/
+
+    size_t len_of_sections = sizeof(sections) / sizeof(sections[0]);
+
+    size_t value = section16.get_train_detection().get_sample_count();
+    int real_value = (int) (section16.get_train_detection().peek_rms() * 1000.0);
+
+    char buffer[32];
+
+    snprintf(buffer, sizeof(buffer), "N: %d - %d - %d", len_of_sections, value, real_value);
+    // auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
+    auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
+
+    ser.reset();
+    response.serialize(ser);
+
+    usb_serial.write_frame(ser);
   }
+#endif
+
 
 #ifdef IS_MASTER
   poll_slaves();
@@ -320,13 +358,13 @@ bool handle_command(LiketrainCommand &cmd)
   }
   case LiketrainCommandType::SetSectionPower:
   {
-    for (Section &section : sections)
+    for (Section *section : sections)
     {
-      if (section.id() != cmd.data.set_section_power.section_id)
+      if (section->id() != cmd.data.set_section_power.section_id)
         continue;
 
       // we found the section
-      section.set_power(cmd.data.set_section_power.power);
+      section->set_power(cmd.data.set_section_power.power);
 
       events.enqueue(
           LiketrainEvent::section_power_change(
@@ -338,13 +376,13 @@ bool handle_command(LiketrainCommand &cmd)
   }
   case LiketrainCommandType::SetSwitchState:
   {
-    for (Switch &sw : switches)
+    for (Switch *sw : switches)
     {
-      if (!sw.matches_id(cmd.data.set_switch_state.switch_id))
+      if (!sw->matches_id(cmd.data.set_switch_state.switch_id))
         continue;
 
       // we found the switch
-      sw.set_state(cmd.data.set_switch_state.state);
+      sw->set_state(cmd.data.set_switch_state.state);
 
       events.enqueue(
           LiketrainEvent::switch_state_change(
@@ -356,14 +394,14 @@ bool handle_command(LiketrainCommand &cmd)
   }
   case LiketrainCommandType::ResetAll:
   {
-    for (Section &section : sections)
+    for (Section *section : sections)
     {
-      section.reset();
+      section->reset();
     }
 
-    for (Switch &sw : switches)
+    for (Switch *sw : switches)
     {
-      sw.reset();
+      sw->reset();
     }
 
     // don't return true, so the ResetAll command will be relayed to the slaves, which will cause them to reset as well

@@ -43,15 +43,15 @@ Section section11(
     SectionPowerRelais(31, 29, 27, 25),
     A10);
 
-Section sections[] = {
-    section24,
-    section5,
-    section21,
-    section22,
-    section10,
-    section6,
-    section7,
-    section11};
+Section *sections[] = {
+    &section24,
+    &section5,
+    &section21,
+    &section22,
+    &section10,
+    &section6,
+    &section7,
+    &section11};
 
 /* -------------------------------- Switches -------------------------------- */
 Switch switchK(

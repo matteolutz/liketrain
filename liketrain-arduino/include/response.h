@@ -57,6 +57,16 @@ public:
         return response;
     }
 
+    static LiketrainResponse debug_message(const char *message, uint32_t len)
+    {
+        LiketrainResponse response;
+        response.type = LiketrainResponseType::DebugMessage;
+        response.data.debug_message.len = len;
+        response.data.debug_message.message = new char[len];
+        memcpy(response.data.debug_message.message, message, len);
+        return response;
+    }
+
     static LiketrainResponse event(LiketrainEvent &event)
     {
         LiketrainResponse response;

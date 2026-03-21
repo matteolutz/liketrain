@@ -15,7 +15,8 @@
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
 
 // the minimum train detection sensor RMS value to consider the section occupied
-#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.179
+#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.415
+// #define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.0
 
 enum class SectionPowerRelaisSwitchingState
 {
@@ -178,6 +179,8 @@ public:
     SectionPower current_power() const { return power_relais.get_current_power(); }
     void set_power(SectionPower power) { power_relais.set_power(power); }
     void set_power_blocking(SectionPower power) { power_relais.set_power_blocking(power); }
+
+    ACS712 &get_train_detection() { return train_detection; }
 
     uint8_t id() const { return section_id; }
 

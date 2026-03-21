@@ -43,15 +43,15 @@ Section section13(
     SectionPowerRelais(Relais(25, LOW), Relais(23, LOW), Relais(14, LOW), Relais(15, LOW)),
     A8);
 
-Section sections[] = {
-    section20,
-    section3,
-    section16,
-    section15,
-    section8,
-    section2,
-    section14,
-    section13};
+Section *sections[] = {
+    &section20,
+    &section3,
+    &section16,
+    &section15,
+    &section8,
+    &section2,
+    &section14,
+    &section13};
 
 /* -------------------------------- Switches -------------------------------- */
 Switch switchH(
@@ -76,14 +76,14 @@ Switch switchL(
     "L",
     Relais(24));
 
-Switch switches[] = {
-    switchH,
-    swtichQ,
-    switchF,
-    switchE,
-    swtichI,
-    switchO,
-    switchL};
+Switch* switches[] = {
+    &switchH,
+    &swtichQ,
+    &switchF,
+    &switchE,
+    &swtichI,
+    &switchO,
+    &switchL};
 
 SwitchMaster switch_master(Relais(22));
 

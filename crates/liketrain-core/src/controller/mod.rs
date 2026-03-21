@@ -535,7 +535,7 @@ impl Controller {
                 command_rx,
             })?;
 
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(Duration::from_secs(5));
 
         let ctx = EventExecutionContext {
             command_tx: &command_tx,

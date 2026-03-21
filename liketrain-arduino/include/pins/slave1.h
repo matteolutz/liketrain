@@ -39,14 +39,14 @@ Section section26(
     SectionPowerRelais(33, 31, 29, 27),
     A11);
 
-Section sections[] = {
-    section12,
-    section1,
-    section9,
-    section4,
-    section23,
-    section25,
-    section26};
+Section *sections[] = {
+    &section12,
+    &section1,
+    &section9,
+    &section4,
+    &section23,
+    &section25,
+    &section26};
 
 /* -------------------------------- Switches -------------------------------- */
 Switch switchC(

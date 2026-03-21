@@ -9,6 +9,7 @@ public:
     ACS712(uint8_t pin) : pin(pin) {}
 
     void begin();
+    void calibrate();
 
     void update();
 
@@ -20,17 +21,25 @@ public:
         return rms_voltage;
     }
 
+    float peek_rms() { return rms_voltage; }
+    inline int get_raw() { return analogRead(pin); }
+
+    float get_sum_squares() const { return sum_squares; }
+    size_t get_sample_count() const { return samples; }
+
+    unsigned long get_last_sampled_micros() const { return last_sampled_micros; }
+
 private:
-    static const uint16_t SAMPLE_INTERVAL_MICROS = 1000;
-    static const uint16_t SAMPLE_COUNT = 20;
+    static const unsigned long SAMPLE_INTERVAL_MICROS = 500;
+    static const size_t SAMPLE_COUNT = 400;
 
     uint8_t pin;
 
     unsigned long last_sampled_micros = 0;
 
-    float offset = 512.0; // midpoint for 10-bit ADC
+    int offset = 512; // midpoint for 10-bit ADC
 
-    uint16_t samples = 0;
+    size_t samples = 0;
     float sum_squares = 0.0;
 
     float rms_voltage = 0.0;
