@@ -8,15 +8,11 @@
 #include "event.h"
 #include "section_power.h"
 
-#include "ACS712.h"
+#include "ACS712Detector.h"
 
 // the delay in ms, when switching from one power level to anohter
 // (not used when switching to or from Off)
 #define SECTION_POWER_RELAIS_SWITCHING_DELAY 10
-
-// the minimum train detection sensor RMS value to consider the section occupied
-#define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.415
-// #define SECTION_TRAIN_DETECTION_RMS_THRESHOLD 0.0
 
 enum class SectionPowerRelaisSwitchingState
 {
@@ -74,7 +70,7 @@ public:
 
     void update()
     {
-        if (switching_state == SectionPowerRelaisSwitchingState::Idle) 
+        if (switching_state == SectionPowerRelaisSwitchingState::Idle)
             return; // we are not in the middle of switching, nothing to do
 
         unsigned long now = millis();
@@ -92,7 +88,8 @@ public:
 
     SectionPower get_current_power() const { return current_power; }
 
-    void set_power_blocking(SectionPower power) {
+    void set_power_blocking(SectionPower power)
+    {
         if (power == current_power)
             return;
 
@@ -163,24 +160,20 @@ private:
     uint8_t section_id;
 
     SectionPowerRelais power_relais;
-    ACS712 train_detection;
-
-    bool is_occupied = false;
+    ACS712Detector train_detection;
 
     void update_train_detection(Queue<LiketrainEvent> &events);
 
 public:
-    Section(uint8_t section_id, SectionPowerRelais relais, ACS712 train_detection);
+    Section(uint8_t section_id, SectionPowerRelais relais, ACS712Detector train_detection);
 
     void init();
-
-    bool occupied() const { return is_occupied; }
 
     SectionPower current_power() const { return power_relais.get_current_power(); }
     void set_power(SectionPower power) { power_relais.set_power(power); }
     void set_power_blocking(SectionPower power) { power_relais.set_power_blocking(power); }
 
-    ACS712 &get_train_detection() { return train_detection; }
+    ACS712Detector &get_train_detection() { return train_detection; }
 
     uint8_t id() const { return section_id; }
 
@@ -188,9 +181,9 @@ public:
     {
         set_power(SectionPower::Off);
 
-        // not setting this to false would cause a SectionFree event
+        // not resetting the train_detection would cause a SectionFree event
         // being enqueued when the next ACS value is read
-        is_occupied = false;
+        train_detection.reset();
     }
 
     void update(Queue<LiketrainEvent> &events);

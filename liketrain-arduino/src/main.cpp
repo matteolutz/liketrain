@@ -117,11 +117,10 @@ void loop()
 #endif
 
   // update the sections
-  /*for (Section* section : sections)
+  for (Section *section : sections)
   {
     section->update(events);
-  }*/
- section16.update(events);
+  }
 
 #ifdef IS_MASTER
   if (millis() - last_debug >= debug_interval)
@@ -133,13 +132,11 @@ void loop()
 
     size_t len_of_sections = sizeof(sections) / sizeof(sections[0]);
 
-    size_t value = section16.get_train_detection().get_sample_count();
-    int real_value = (int) (section16.get_train_detection().peek_rms() * 1000.0);
+    int real_value = (int)(section16.get_train_detection().get_filtered_value() * 1000.0);
 
     char buffer[32];
 
-    snprintf(buffer, sizeof(buffer), "N: %d - %d - %d", len_of_sections, value, real_value);
-    // auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
+    snprintf(buffer, sizeof(buffer), "N: %d - %d", len_of_sections, real_value);
     auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
 
     ser.reset();
@@ -148,7 +145,6 @@ void loop()
     usb_serial.write_frame(ser);
   }
 #endif
-
 
 #ifdef IS_MASTER
   poll_slaves();
