@@ -28,7 +28,7 @@ Queue<LiketrainCommand> slave_relay(32);
 #ifdef IS_MASTER
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 unsigned long last_debug = millis();
-const unsigned long debug_interval = 700;
+const unsigned long debug_interval = 100;
 
 DeserSerial usb_serial(Serial);
 #endif
@@ -88,6 +88,19 @@ void setup()
 
   rs485_serial.init();
 
+  /*
+  for (int i = 0; i < 100; i++) {
+    switchH.set_state(SwitchState::Left);
+    delay(100);
+    switch_master.blocking_toggle();
+    delay(1000);
+    switchH.set_state(SwitchState::Right);
+    delay(100);
+    switch_master.blocking_toggle();
+    delay(2000);
+  }
+    */
+
 #ifdef SWITCH_TEST
 #ifdef IS_MASTER
   delay(2000);
@@ -117,10 +130,13 @@ void loop()
 #endif
 
   // update the sections
-  for (Section *section : sections)
+  /*for (Section *section : sections)
   {
     section->update(events);
-  }
+  }*/
+
+  section16.update(events);
+  section14.update(events);
 
 #ifdef IS_MASTER
   if (millis() - last_debug >= debug_interval)
@@ -130,13 +146,11 @@ void loop()
     lcd.setCursor(0, 0);
     lcd.print(value);*/
 
-    size_t len_of_sections = sizeof(sections) / sizeof(sections[0]);
-
-    int real_value = (int)(section16.get_train_detection().get_filtered_value() * 1000.0);
+    int peak_value = section14.get_train_detection().get_frame_peak();
 
     char buffer[32];
 
-    snprintf(buffer, sizeof(buffer), "N: %d - %d", len_of_sections, real_value);
+    snprintf(buffer, sizeof(buffer), "N: %d", peak_value);
     auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
 
     ser.reset();

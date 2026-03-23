@@ -10,6 +10,7 @@ void Section::init()
     power_relais.init();
 
     train_detection.begin();
+    train_detection.calibrate();
 }
 
 void Section::update_train_detection(Queue<LiketrainEvent> &events)

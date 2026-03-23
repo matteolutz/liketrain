@@ -16,27 +16,33 @@ public:
     ACS712Detector(uint8_t pin);
 
     void begin();
+    void calibrate();
+
     ACS712DetectorEvent update();
 
-    float get_filtered_value() const { return filtered; }
+    int get_frame_peak() const { return current_frame_peak; }
 
     bool occupied() const { return is_occupied; }
 
     void reset();
 
 private:
+    void new_frame();
+
     uint8_t pin;
 
     ACS712DetectorEvent last_event = ACS712DetectorEvent::None;
     bool is_occupied = false;
 
-    float filtered = 0.0;
-    float alpha = 0.05;
-
     int offset = 512; // Midpoint for 10-bit ADC
 
-    const float enter_threshold = 30.0;
-    const float leave_threshold = 20.0;
+    int current_frame_peak = 0.0;
+
+    unsigned long last_frame_start = 0;
+    const unsigned long frame_time = 20; // ms
+    
+    const int enter_threshold = 40;
+    const int leave_threshold = 30;
 };
 
 #endif // ACS712_DETECTOR_H

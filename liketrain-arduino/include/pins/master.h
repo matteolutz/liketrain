@@ -57,7 +57,7 @@ Section *sections[] = {
 Switch switchH(
     "H",
     Relais(2));
-Switch swtichQ(
+Switch switchQ(
     "Q",
     Relais(3));
 Switch switchF(
@@ -68,7 +68,7 @@ Switch switchE(
     Relais(5));
 Switch swtichI(
     "I",
-    Relais(6));
+    Relais(6, LOW));
 Switch switchO(
     "O",
     Relais(7));
@@ -78,7 +78,7 @@ Switch switchL(
 
 Switch* switches[] = {
     &switchH,
-    &swtichQ,
+    &switchQ,
     &switchF,
     &switchE,
     &swtichI,

@@ -99,8 +99,7 @@ fn test_controller() {
 
     println!("Route 1 valid: {}", r1.pretty_print(&track));
 
-    let hardware_comm =
-        SerialControllerHardwareCommunication::new("/dev/tty.usbmodem11301", 115200);
+    let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
 
     let controller_config = ControllerConfig {
         track,

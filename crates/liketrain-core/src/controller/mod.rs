@@ -297,6 +297,8 @@ impl Controller {
                 if let Some(transition) = train.get_transition_to_next_section().cloned() {
                     let next_section = transition.destination();
 
+                    log::debug!("next section is: {}", next_section);
+
                     // don't just check, if the section is occupied, but also if there are other trains inbound
                     // for the next section. if there are other trains inbound, we need to resolve the conflict.
                     // Probably have some sort of waiting queue for each section, and if there are other trains inbound

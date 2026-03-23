@@ -79,33 +79,33 @@ impl Train {
     }
 
     pub fn entered_section(&mut self, section_id: SectionId) {
-        let Some(transition) = self.get_transition_to_next_section() else {
-            return;
-        };
+        let transition = self.get_transition_to_next_section().cloned();
 
-        let expected_next_section = transition.destination();
-        if expected_next_section != section_id {
+        let expected_next_section = transition.as_ref().map(|trans| trans.destination());
+
+        if expected_next_section.is_some_and(|id| id != section_id) {
             // TODO: handle this?? maybe switch to manual mode
             return;
         }
-
-        let section_end = transition.destination_section_end();
 
         match &mut self.mode {
             TrainDrivingMode::Route {
                 current_via_idx,
                 current_section_direction,
-                ..
+                route,
             } => {
                 match current_via_idx {
                     Some(idx) => *idx += 1,
                     None => *current_via_idx = Some(0),
                 }
 
-                match section_end {
-                    SectionEnd::End => *current_section_direction = Direction::Backward,
-                    SectionEnd::Start => *current_section_direction = Direction::Forward,
-                }
+                match transition.map(|trans| trans.destination_section_end()) {
+                    None => *current_section_direction = route.starting_direction(),
+                    Some(section_end) => match section_end {
+                        SectionEnd::End => *current_section_direction = Direction::Backward,
+                        SectionEnd::Start => *current_section_direction = Direction::Forward,
+                    },
+                };
             }
         }
     }
