@@ -6,7 +6,7 @@ use std::{
 use crate::{
     SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
-    ui::{UiEvent, UiSectionEvent, UiSwitchEvent},
+    ui::{UiCommand, UiEvent, UiSectionEvent, UiSwitchEvent},
 };
 
 mod state;
@@ -65,6 +65,7 @@ pub struct Controller {
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
 
     ui_event_tx: std::sync::mpsc::Sender<UiEvent>,
+    ui_command_rx: crossbeam::channel::Receiver<UiCommand>,
     // TODO: ui_command_rx
 }
 
@@ -73,6 +74,7 @@ impl Controller {
         config: ControllerConfig,
         hardware_comm: impl ControllerHardwareCommunication + 'static,
         ui_event_tx: std::sync::mpsc::Sender<UiEvent>,
+        ui_command_rx: crossbeam::channel::Receiver<UiCommand>,
     ) -> Self {
         Self {
             track: config.track,
@@ -84,6 +86,7 @@ impl Controller {
             section_reservations: HashMap::new(),
             hardware_comm: Box::new(hardware_comm),
             ui_event_tx,
+            ui_command_rx,
         }
     }
 
@@ -97,6 +100,10 @@ impl Controller {
         self.trains
             .get_mut(&train_id)
             .ok_or(ControllerError::TrainNotFound(train_id))
+    }
+
+    pub fn track(&self) -> &Track {
+        &self.track
     }
 }
 
@@ -443,6 +450,29 @@ impl Controller {
         Ok(())
     }
 
+    fn handle_ui_command(
+        &mut self,
+        command: UiCommand,
+        ctx: EventExecutionContext,
+    ) -> Result<(), ControllerError> {
+        match command {
+            UiCommand::SetSectionPower { section_id, power } => {
+                ctx.exec(HardwareCommand::SetSectionPower {
+                    section_id: section_id.as_u32(),
+                    power,
+                })?;
+            }
+            UiCommand::SetSwitchState { switch_id, state } => {
+                ctx.exec(HardwareCommand::SetSwitchState {
+                    switch_id: switch_id.try_into().unwrap(),
+                    state: state.into(),
+                })?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn resolve_pending_events(
         &mut self,
         ctx: EventExecutionContext,
@@ -549,19 +579,27 @@ impl Controller {
 
         // main loop
         loop {
-            if let Some(event_timeout) = self.scheduler.next_event_duration() {
-                crossbeam::select! {
-                    recv(event_rx) -> event => {
-                        if let Ok(event) = event {
-                            self.handle_event(event, ctx)?;
-                        }
-                    }
-                    default(event_timeout)  => {
-                        self.resolve_pending_events(ctx)?;
+            // if we don't have any scheduled events,
+            // wait 1 second before running again
+            let event_timeout = self
+                .scheduler
+                .next_event_duration()
+                .unwrap_or(Duration::from_millis(500));
+
+            crossbeam::select! {
+                recv(event_rx) -> event => {
+                    if let Ok(event) = event {
+                        self.handle_event(event, ctx)?;
                     }
                 }
-            } else if let Ok(event) = event_rx.recv() {
-                self.handle_event(event, ctx)?;
+                recv(self.ui_command_rx) -> command => {
+                    if let Ok(command) = command {
+                        self.handle_ui_command(command, ctx)?;
+                    }
+                }
+                default(event_timeout)  => {
+                    self.resolve_pending_events(ctx)?;
+                }
             }
         }
     }

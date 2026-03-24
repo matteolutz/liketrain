@@ -107,7 +107,8 @@ fn test_controller() {
     };
 
     let (tx, _) = mpsc::channel();
-    let controller = Controller::new(controller_config, hardware_comm, tx);
+    let (_, rx) = crossbeam::channel::unbounded();
+    let controller = Controller::new(controller_config, hardware_comm, tx, rx);
 
     controller.start().unwrap();
 }

@@ -1,6 +1,6 @@
 use crate::{SectionEnd, SectionId, SwitchId, SwitchState};
 
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub enum Connection {
     Direct {
         to: SectionId,

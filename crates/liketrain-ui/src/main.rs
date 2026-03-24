@@ -3,18 +3,26 @@ use std::rc::Rc;
 use gpui::{
     App, Bounds, Context, Entity, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
-use liketrain_core::{Direction, Route, Track, TrackGeometry, Train, parser::Parser};
+use gpui_component::Root;
+use liketrain_core::{
+    ControllerConfig, Direction, Route, Track, TrackGeometry, Train, TrainId,
+    comm::SerialControllerHardwareCommunication, parser::Parser,
+};
 
 use crate::{
+    controller::ControllerUiWrapper,
     ebula::{Ebula, EbulaTheme},
     layout::{Layout, LayoutRenderer, ResolvedLayout},
+    window::ControlsWindow,
 };
 
 mod app_ext;
 mod assets;
+mod controller;
 mod ebula;
 mod layout;
 mod ui;
+mod window;
 
 struct HelloWorld {
     renderer: Entity<LayoutRenderer>,
@@ -71,10 +79,24 @@ fn main() {
     let test_route = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track).unwrap();
     let test_train = Train::from_route("4218", test_route);
 
+    let controller_config = ControllerConfig {
+        track: track.as_ref().clone(),
+        trains: [(TrainId::new(1), test_train.clone())]
+            .into_iter()
+            .collect(),
+    };
+
+    let hardware_comm = SerialControllerHardwareCommunication::new("test", 115200);
+
     gpui_platform::application()
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
+            let controller = ControllerUiWrapper::new(cx, controller_config, hardware_comm);
+            cx.set_global(controller);
+
             assets::init(cx).unwrap();
+            gpui_component::init(cx);
+
             log::debug!("fonts: {:#?}", cx.text_system().all_font_names());
 
             let bounds = Bounds::centered(None, size(px(500.), px(500.0)), cx);
@@ -101,6 +123,21 @@ fn main() {
                     cx.new(|cx| {
                         Ebula::new(track.clone(), test_train, EbulaTheme::default_light(), cx)
                     })
+                },
+            )
+            .unwrap();
+
+            let bounds = Bounds::centered(None, size(px(500.), px(500.0)), cx);
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    ..Default::default()
+                },
+                |window, cx| {
+                    window.set_window_title("liketrain - Controls");
+                    let view = cx.new(|cx| ControlsWindow::new(cx));
+
+                    cx.new(|cx| Root::new(view, window, cx))
                 },
             )
             .unwrap();

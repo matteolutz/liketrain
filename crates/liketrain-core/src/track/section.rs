@@ -114,7 +114,7 @@ impl<'de> Deserialize<'de> for SectionId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Section {
     pub(super) name: String,
 

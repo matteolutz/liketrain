@@ -116,7 +116,7 @@ impl SwitchConnection {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Switch {
     pub(super) name: String,
 

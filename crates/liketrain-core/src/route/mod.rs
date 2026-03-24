@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::{Direction, SectionEnd, SectionId, SectionTransition, Track};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Route {
     vias: Vec<SectionId>,
     starting_direction: Direction,

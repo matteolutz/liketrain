@@ -1,6 +1,6 @@
 use crate::{Direction, Route, SectionId};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TrainDrivingMode {
     Route {
         route: Route,

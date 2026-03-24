@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit"] }
+gpui-component = { git = "https://github.com/matteolutz/gpui-component" }
+
 kiss_xml = "1.0.6"
 
 liketrain-core = { path = "../liketrain-core" }
@@ -15,6 +17,8 @@ serde_json.workspace = true
 
 itertools.workspace = true
 log.workspace = true
+
+crossbeam.workspace = true
 
 env_logger = "0.11.9"
 vek = "0.17.2"

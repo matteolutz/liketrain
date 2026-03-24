@@ -30,7 +30,7 @@ impl From<u32> for TrainId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Train {
     name: String,
 

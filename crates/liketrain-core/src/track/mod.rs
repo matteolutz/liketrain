@@ -20,7 +20,7 @@ pub use geo::*;
 
 use crate::Direction;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Track {
     sections: HashMap<SectionId, Section>,
     switches: HashMap<SwitchId, Switch>,

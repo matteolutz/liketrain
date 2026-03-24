@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::SectionId;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackSectionWaypoint {
     /// The distance along the section in meters (going forward)
     pub at_meter: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackSectionGeometry {
     /// The length of this section in meters (already in respect to the tracks scale)
     pub length: f32,
@@ -19,7 +19,7 @@ pub struct TrackSectionGeometry {
     pub waypoints: Vec<TrackSectionWaypoint>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TrackGeometry {
     sections: HashMap<SectionId, TrackSectionGeometry>,
 }
