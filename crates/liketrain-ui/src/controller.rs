@@ -11,7 +11,7 @@ use liketrain_core::{
     ui::{UiCommand, UiEvent},
 };
 
-struct ControllerEventEmitter {}
+pub struct ControllerEventEmitter {}
 impl EventEmitter<UiEvent> for ControllerEventEmitter {}
 
 pub struct ControllerUiWrapper {
@@ -62,11 +62,15 @@ impl ControllerUiWrapper {
 
     pub fn send(&self, command: impl Into<UiCommand>) {
         let command = command.into();
-        self.command_tx.send(command);
+        let _ = self.command_tx.send(command);
     }
 
-    pub fn event_emitter(&self) -> &Entity<ControllerEventEmitter> {
-        &self.event_emitter
+    pub fn event_emitter(cx: &App) -> &Entity<ControllerEventEmitter> {
+        &cx.global::<Self>().event_emitter
+    }
+
+    pub fn controller(cx: &App) -> &Controller {
+        &cx.global::<Self>().controller
     }
 }
 

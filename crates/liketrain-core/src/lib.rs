@@ -16,3 +16,5 @@ pub mod serial;
 
 mod controller;
 pub use controller::*;
+
+pub use liketrain_hardware as hardware;

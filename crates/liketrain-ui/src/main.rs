@@ -135,7 +135,7 @@ fn main() {
                 },
                 |window, cx| {
                     window.set_window_title("liketrain - Controls");
-                    let view = cx.new(|cx| ControlsWindow::new(cx));
+                    let view = cx.new(|cx| ControlsWindow::new(window, cx));
 
                     cx.new(|cx| Root::new(view, window, cx))
                 },

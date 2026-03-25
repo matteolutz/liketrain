@@ -105,6 +105,10 @@ impl Controller {
     pub fn track(&self) -> &Track {
         &self.track
     }
+
+    pub fn section_state(&self, section_id: SectionId) -> Option<&SectionState> {
+        self.section_states.get(&section_id)
+    }
 }
 
 impl Controller {
