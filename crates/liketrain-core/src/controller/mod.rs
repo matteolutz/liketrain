@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     time::Duration,
 };
 
@@ -50,17 +51,50 @@ impl<'a> EventExecutionContext<'a> {
     }
 }
 
-pub struct Controller {
+pub struct ControllerState {
     track: Track,
     trains: HashMap<TrainId, Train>,
 
     section_states: HashMap<SectionId, SectionState>,
     switch_states: HashMap<SwitchId, SwitchState>,
 
-    scheduler: Scheduler,
-
     section_queues: HashMap<SectionId, VecDeque<TrainId>>,
     section_reservations: HashMap<SectionId, TrainId>,
+}
+
+impl ControllerState {
+    pub fn train(&self, train_id: TrainId) -> Result<&Train, ControllerError> {
+        self.trains
+            .get(&train_id)
+            .ok_or(ControllerError::TrainNotFound(train_id))
+    }
+
+    pub fn train_mut(&mut self, train_id: TrainId) -> Result<&mut Train, ControllerError> {
+        self.trains
+            .get_mut(&train_id)
+            .ok_or(ControllerError::TrainNotFound(train_id))
+    }
+
+    pub fn track(&self) -> &Track {
+        &self.track
+    }
+
+    pub fn section_state(&self, section_id: SectionId) -> Option<&SectionState> {
+        self.section_states.get(&section_id)
+    }
+}
+
+pub struct Controller {
+    // track: Track,
+    // trains: HashMap<TrainId, Train>,
+
+    // section_states: HashMap<SectionId, SectionState>,
+    // switch_states: HashMap<SwitchId, SwitchState>,
+    scheduler: Scheduler,
+
+    // section_queues: HashMap<SectionId, VecDeque<TrainId>>,
+    // section_reservations: HashMap<SectionId, TrainId>,
+    state: Arc<RwLock<ControllerState>>,
 
     hardware_comm: Box<dyn ControllerHardwareCommunication>,
 
@@ -89,26 +123,6 @@ impl Controller {
             ui_command_rx,
         }
     }
-
-    pub fn train(&self, train_id: TrainId) -> Result<&Train, ControllerError> {
-        self.trains
-            .get(&train_id)
-            .ok_or(ControllerError::TrainNotFound(train_id))
-    }
-
-    pub fn train_mut(&mut self, train_id: TrainId) -> Result<&mut Train, ControllerError> {
-        self.trains
-            .get_mut(&train_id)
-            .ok_or(ControllerError::TrainNotFound(train_id))
-    }
-
-    pub fn track(&self) -> &Track {
-        &self.track
-    }
-
-    pub fn section_state(&self, section_id: SectionId) -> Option<&SectionState> {
-        self.section_states.get(&section_id)
-    }
 }
 
 impl Controller {
@@ -118,9 +132,20 @@ impl Controller {
 }
 
 impl Controller {
+    fn read_state(&self) -> RwLockReadGuard<'_, ControllerState> {
+        self.state.read().unwrap()
+    }
+
+    fn write_state(&self) -> RwLockWriteGuard<'_, ControllerState> {
+        self.state.write().unwrap()
+    }
+
     fn set_switch_state(&mut self, switch_id: SwitchId, state: impl Into<SwitchState>) {
         let state = state.into();
-        self.switch_states.insert(switch_id.clone(), state);
+
+        self.write_state()
+            .switch_states
+            .insert(switch_id.clone(), state);
 
         self.emit_ui(UiSwitchEvent::SetState {
             id: switch_id,
@@ -129,7 +154,8 @@ impl Controller {
     }
 
     fn try_reserve_section(&mut self, section_id: SectionId, train_id: TrainId) -> bool {
-        if let Some(&existing_reservation) = self.section_reservations.get(&section_id) {
+        if let Some(&existing_reservation) = self.read_state().section_reservations.get(&section_id)
+        {
             if existing_reservation != train_id {
                 return false;
             }
@@ -138,15 +164,22 @@ impl Controller {
             return true;
         }
 
-        let section_state = self.section_states.entry(section_id).or_default();
-        if let Some(occupant) = section_state.occupied {
-            // can't reserve a section that is already occupied by another train
-            if occupant != train_id {
-                return false;
+        {
+            let mut state = self.write_state();
+            let section_state = state.section_states.entry(section_id).or_default();
+
+            if let Some(occupant) = section_state.occupied {
+                // can't reserve a section that is already occupied by another train
+                if occupant != train_id {
+                    return false;
+                }
             }
         }
 
-        self.section_reservations.insert(section_id, train_id);
+        self.write_state()
+            .section_reservations
+            .insert(section_id, train_id);
+
         self.emit_ui(UiSectionEvent::Reserved {
             section_id,
             train_id: Some(train_id),
@@ -156,8 +189,9 @@ impl Controller {
     }
 
     fn release_reservation(&mut self, section_id: SectionId, train_id: TrainId) {
-        if self.section_reservations.get(&section_id) == Some(&train_id) {
-            self.section_reservations.remove(&section_id);
+        if self.read_state().section_reservations.get(&section_id) == Some(&train_id) {
+            self.write_state().section_reservations.remove(&section_id);
+
             self.emit_ui(UiSectionEvent::Reserved {
                 section_id,
                 train_id: None,
@@ -177,7 +211,8 @@ impl Controller {
     }
 
     fn is_section_occupied(&self, section_id: SectionId) -> bool {
-        self.section_states
+        self.read_state()
+            .section_states
             .get(&section_id)
             .is_some_and(|state| state.occupied.is_some())
     }
@@ -188,8 +223,18 @@ impl Controller {
         occupied: bool,
         _ctx: EventExecutionContext,
     ) {
-        let state = self.section_states.entry(section_id).or_default();
-        let previous_occupied = state.occupied.take();
+        /*let state = controller_state
+        .section_states
+        .entry(section_id)
+        .or_default();*/
+
+        let previous_occupied = self
+            .write_state()
+            .section_states
+            .entry(section_id)
+            .or_default()
+            .occupied
+            .take();
 
         if occupied {
             if previous_occupied.is_some() {
@@ -197,39 +242,50 @@ impl Controller {
                 // TODO: how to handle this??
             }
 
-            let mut inbound_trains = self
-                .trains
-                .iter_mut()
-                .filter(|(_, train)| {
-                    train
-                        .get_next_section()
-                        .is_some_and(|next_section| next_section == section_id)
-                })
-                .collect::<Vec<_>>();
+            let inbound_train_id = {
+                let mut state = self.write_state();
 
-            if inbound_trains.is_empty() {
-                // there are no inbound trains, which is weird
-                // TODO: probably stop everything? something went wrong
-                return;
-            }
+                let mut inbound_trains = state
+                    .trains
+                    .iter_mut()
+                    .filter(|(_, train)| {
+                        train
+                            .get_next_section()
+                            .is_some_and(|next_section| next_section == section_id)
+                    })
+                    .collect::<Vec<_>>();
 
-            if inbound_trains.len() > 1 {
-                // multiple trains are inbound for the same section??? something went wrong
-                // TODO: probably stop everything? something went wrong
-                return;
-            }
+                if inbound_trains.is_empty() {
+                    // there are no inbound trains, which is weird
+                    // TODO: probably stop everything? something went wrong
+                    return;
+                }
 
-            let (inbound_train_id, inbound_train) = &mut inbound_trains[0];
+                if inbound_trains.len() > 1 {
+                    // multiple trains are inbound for the same section??? something went wrong
+                    // TODO: probably stop everything? something went wrong
+                    return;
+                }
 
-            // it's just one train, so this must be the train that just entered this section
-            inbound_train.entered_section(section_id);
+                let (inbound_train_id, inbound_train) = &mut inbound_trains[0];
+
+                // it's just one train, so this must be the train that just entered this section
+                inbound_train.entered_section(section_id);
+
+                **inbound_train_id
+            };
+
             self.scheduler
                 .schedule_now(ScheduledEvent::TrainEnteredSection {
-                    train_id: **inbound_train_id,
+                    train_id: inbound_train_id,
                     section_id,
                 });
 
-            state.occupied = Some(**inbound_train_id);
+            self.write_state()
+                .section_states
+                .entry(section_id)
+                .or_default()
+                .occupied = Some(inbound_train_id);
         } else {
             // if this section was occupied, send TrainLeftSection
             if let Some(previous_occupied) = previous_occupied {
@@ -248,7 +304,8 @@ impl Controller {
         power: HardwareSectionPower,
         _ctx: EventExecutionContext,
     ) {
-        let state = self.section_states.entry(section_id).or_default();
+        let mut state = self.write_state();
+        let state = state.section_states.entry(section_id).or_default();
         state.power = power;
 
         self.emit_ui(UiSectionEvent::SetPower { section_id, power });
@@ -303,9 +360,12 @@ impl Controller {
                 train_id,
                 section_id: current_section_id,
             } => {
-                let train = self.train(train_id)?;
-
-                if let Some(transition) = train.get_transition_to_next_section().cloned() {
+                if let Some(transition) = self
+                    .read_state()
+                    .train(train_id)?
+                    .get_transition_to_next_section()
+                    .cloned()
+                {
                     let next_section = transition.destination();
 
                     log::debug!("next section is: {}", next_section);
@@ -345,10 +405,12 @@ impl Controller {
                         })?;
 
                         // append it to the waiting trains
-                        self.section_queues
+                        self.write_state()
+                            .section_queues
                             .entry(next_section)
                             .or_default()
                             .push_back(train_id);
+
                         self.emit_ui(UiSectionEvent::QueueEnqueued {
                             section_id: next_section,
                             train_id,
@@ -363,6 +425,7 @@ impl Controller {
                 self.release_reservation(section_id, train_id);
 
                 while let Some(waiting_train_id) = self
+                    .write_state()
                     .section_queues
                     .get_mut(&section_id)
                     .and_then(|queue| queue.pop_front())
@@ -372,22 +435,27 @@ impl Controller {
                         train_id: waiting_train_id,
                     });
 
-                    // this train was on the queue for this section id
-                    // this means, either the section was occupied before
-                    // or there was another train inbound
-                    let train = self.trains.get(&waiting_train_id).unwrap();
+                    let (current_section, transition) = {
+                        let state = self.read_state();
+                        // this train was on the queue for this section id
+                        // this means, either the section was occupied before
+                        // or there was another train inbound
+                        let train = state.trains.get(&waiting_train_id).unwrap();
 
-                    if train
-                        .get_next_section()
-                        .is_none_or(|next_section| next_section != section_id)
-                    {
-                        // this train has changed its mind? it doesn't want to go to this section anymore
-                        // check if there's another train waiting on the queue
-                        continue;
-                    }
+                        if train
+                            .get_next_section()
+                            .is_none_or(|next_section| next_section != section_id)
+                        {
+                            // this train has changed its mind? it doesn't want to go to this section anymore
+                            // check if there's another train waiting on the queue
+                            continue;
+                        }
 
-                    let current_section = train.get_current_section().unwrap();
-                    let transition = train.get_transition_to_next_section().cloned().unwrap(); // safe to unwrap
+                        let current_section = train.get_current_section().unwrap();
+                        let transition = train.get_transition_to_next_section().cloned().unwrap(); // safe to unwrap
+
+                        (current_section, transition)
+                    };
 
                     self.try_reserve_section(section_id, train_id);
 
@@ -560,7 +628,7 @@ impl Controller {
         Ok(())
     }
 
-    pub fn start(mut self) -> Result<(), ControllerError> {
+    pub fn start(&mut self) -> Result<(), ControllerError> {
         let (command_tx, command_rx) = crossbeam::channel::unbounded();
         let (event_tx, event_rx) = crossbeam::channel::unbounded();
 

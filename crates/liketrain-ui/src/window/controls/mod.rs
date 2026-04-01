@@ -2,7 +2,10 @@ use gpui::{
     AppContext, Context, Entity, ParentElement, Render, Styled, Subscription, Window, div,
     prelude::FluentBuilder,
 };
-use gpui_component::tab::{Tab, TabBar};
+use gpui_component::{
+    button::Button,
+    tab::{Tab, TabBar},
+};
 
 use crate::{controller::ControllerUiWrapper, window::controls::section::SectionsTab};
 
@@ -45,6 +48,14 @@ impl Render for ControlsWindow {
             .size_full()
             .flex()
             .flex_col()
+            .child(div().text_xl().child("Controls"))
+            .child(
+                div().w_full().flex().p_2().child(
+                    Button::new("start-button")
+                        .label("Start")
+                        .on_click(|_, _, _| {}),
+                ),
+            )
             .child(
                 TabBar::new("tabs")
                     .selected_index(self.selected_tab)
