@@ -9,7 +9,7 @@
 #include "slave.h"
 
 // #define SLAVE_ID 2
-#define SLAVE_COUNT 0
+#define SLAVE_COUNT 1
 
 // #define SWITCH_TEST
 

@@ -99,7 +99,7 @@ public:
         // when switching from off to any other power level, we can directly power on the new relais without delay
         if (current_power == SectionPower::Off)
         {
-            power_to_relais(power)->on();
+            power_to_relais(power)->on(); // power can't be Off here, becuase in that case power == current_power should have been true
             current_power = power;
             return;
         }
@@ -118,6 +118,7 @@ public:
 
         // power on the new relais
         power_to_relais(power)->on();
+        current_power = power;
     }
 
     void set_power(SectionPower power)

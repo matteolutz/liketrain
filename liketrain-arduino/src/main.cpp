@@ -90,6 +90,24 @@ void setup()
 
   /*
   for (int i = 0; i < 100; i++) {
+    section15.set_power_blocking(SectionPower::Quarter);
+    delay(1000);
+
+    section15.set_power_blocking(SectionPower::Half);
+    delay(1000);
+
+    section15.set_power_blocking(SectionPower::ThreeQuarters);
+    delay(1000);
+
+    section15.set_power_blocking(SectionPower::Full);
+    delay(1000);
+
+    section15.set_power_blocking(SectionPower::Off);
+    delay(1000);
+  }*/
+
+  /*
+  for (int i = 0; i < 100; i++) {
     switchH.set_state(SwitchState::Left);
     delay(100);
     switch_master.blocking_toggle();
@@ -136,8 +154,10 @@ void loop()
   }*/
 
   section16.update(events);
+  section15.update(events);
   section14.update(events);
 
+#if false
 #ifdef IS_MASTER
   if (millis() - last_debug >= debug_interval)
   {
@@ -146,7 +166,7 @@ void loop()
     lcd.setCursor(0, 0);
     lcd.print(value);*/
 
-    int peak_value = section14.get_train_detection().get_frame_peak();
+    int peak_value = section16.get_train_detection().get_frame_peak();
 
     char buffer[32];
 
@@ -158,6 +178,7 @@ void loop()
 
     usb_serial.write_frame(ser);
   }
+#endif
 #endif
 
 #ifdef IS_MASTER
@@ -238,6 +259,10 @@ void poll_slaves()
     }
 
     auto event_count = slave_response.data.event_count.event_count;
+
+    lcd.setCursor(0, 0);
+    lcd.print("S.Cnt: ");
+    lcd.print(event_count);
 
     // get as many events as the slave has, or until a timeout occurs
     for (uint32_t i = 0; i < event_count; i++)

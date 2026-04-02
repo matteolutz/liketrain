@@ -40,12 +40,16 @@ ACS712DetectorEvent ACS712Detector::update()
     current_frame_peak = max(current_frame_peak, magnitude);
 
     if (millis() - last_frame_start < frame_time)
-        return ACS712DetectorEvent::None;
+        return ACS712DetectorEvent::None; // the frame is not completed yet
+
+    if (millis() - last_event_time < event_debounce_time)
+        return ACS712DetectorEvent::None; // debounce time has not passed since last event
 
     // train has entered
     if (!is_occupied && current_frame_peak > enter_threshold)
     {
         is_occupied = true;
+        last_event_time = millis();
         return ACS712DetectorEvent::Occupied;
     }
 
@@ -53,6 +57,7 @@ ACS712DetectorEvent ACS712Detector::update()
     if (is_occupied && current_frame_peak < leave_threshold)
     {
         is_occupied = false;
+        last_event_time = millis();
         return ACS712DetectorEvent::Free;
     }
 
