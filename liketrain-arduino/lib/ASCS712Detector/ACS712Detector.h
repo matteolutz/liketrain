@@ -42,7 +42,10 @@ private:
     const unsigned long frame_time = 20; // ms
     
     const int enter_threshold = 40;
-    const int leave_threshold = 30;
+    const int leave_threshold = 20;
+
+    unsigned long last_event_time = 0;
+    const unsigned long event_debounce_time = 1000;
 };
 
 #endif // ACS712_DETECTOR_H

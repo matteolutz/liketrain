@@ -92,7 +92,7 @@ fn test_controller() {
     let eval = Evaluator::default();
     let track = eval.evaluate(track_defs).unwrap();
 
-    let Some(r1) = Route::new("RE5", [16_usize, 14, 12, 10], Direction::Forward, &track) else {
+    let Some(r1) = Route::new("RE5", [16_usize, 15], Direction::Forward, &track) else {
         assert!(false, "Route 1 failed");
         return;
     };
