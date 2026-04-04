@@ -12,7 +12,7 @@
 /* -------------------------------- Sections -------------------------------- */
 Section section20(
     20,
-    SectionPowerRelais(Relais(26, LOW), Relais(28, LOW), Relais(30, LOW), Relais(20, LOW)),
+    SectionPowerRelais(Relais(26, LOW), Relais(28, LOW), Relais(30, LOW), Relais(32, LOW)),
     A14);
 Section section3(
     3,

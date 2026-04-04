@@ -28,7 +28,7 @@ Section section4(
     A10);
 Section section23(
     23,
-    SectionPowerRelais(Relais(53, LOW), Relais(52, LOW), Relais(45, LOW), Relais(43, LOW)),
+    SectionPowerRelais(Relais(53, LOW), Relais(52, LOW), Relais(19, LOW), Relais(43, LOW)),
     A14);
 Section section25(
     25,

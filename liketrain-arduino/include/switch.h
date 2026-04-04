@@ -22,13 +22,26 @@ private:
     SwitchId switch_id;
     Relais relais;
 
+    SwitchState current_state = SwitchState::Left;
+    SwitchState off_state = SwitchState::Left;
+
 public:
     Switch(SwitchId switch_id, Relais relais) : relais(relais)
     {
         memccpy(this->switch_id, switch_id, 0, SWITCH_ID_LEN);
     }
+    
+    Switch(SwitchId switch_id, Relais relais, SwitchState off_state) : relais(relais), off_state(off_state)
+    {
+        memccpy(this->switch_id, switch_id, 0, SWITCH_ID_LEN);
+    }
 
     Switch(const char *switch_id_str, Relais relais) : relais(relais)
+    {
+        strncpy((char *)this->switch_id, switch_id_str, SWITCH_ID_LEN);
+    }
+
+    Switch(const char *switch_id_str, Relais relais, SwitchState off_state) : relais(relais), off_state(off_state)
     {
         strncpy((char *)this->switch_id, switch_id_str, SWITCH_ID_LEN);
     }
@@ -40,15 +53,18 @@ public:
 
     inline void set_state(SwitchState state)
     {
-        switch (state)
-        {
-        case SwitchState::Left:
+        current_state = state;
+
+        if (state == off_state)
             relais.off();
-            break;
-        case SwitchState::Right:
+        else
             relais.on();
-            break;
-        }
+    }
+
+    void was_toggled() 
+    {
+        if (current_state != off_state)
+            relais.off();
     }
 
     inline void reset() { set_state(SwitchState::Left); }
