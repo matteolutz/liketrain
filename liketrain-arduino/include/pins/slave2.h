@@ -62,13 +62,13 @@ Switch swtichA(
     Relais(6));
 Switch switchN(
     "N",
-    Relais(5));
+    Relais(5, LOW));
 Switch switchO(
-    "4",
+    "O",
     Relais(4));
 Switch swtichG(
     "G",
-    Relais(2));
+    Relais(2, LOW));
 
 Switch* switches[] = {
     &switchK,

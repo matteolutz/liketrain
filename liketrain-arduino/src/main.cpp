@@ -8,8 +8,7 @@
 #include "event.h"
 #include "response.h"
 
-#include "slave_command.h"
-#include "slave_response.h"
+#include "slave_bus_message.h"
 
 #include "config.h"
 
@@ -47,7 +46,7 @@ void send_ack_to_host();
 
 // ~~~~~~~~~~~ Slave functions ~~~~~~~~~~~ //
 #ifndef IS_MASTER
-void read_master_commands();
+void read_slave_bus_messages();
 #endif
 
 // Handle a received command and return whether it was handled successfully.
@@ -75,6 +74,7 @@ void setup()
   for (Switch *sw : switches)
   {
     sw->init();
+    sw->reset();
   }
 
 #ifdef IS_MASTER
@@ -139,6 +139,10 @@ void setup()
   }
 #endif
 #endif
+
+#ifdef IS_MASTER
+  delay(1000);
+#endif
 }
 
 void loop()
@@ -146,14 +150,14 @@ void loop()
 #ifdef IS_MASTER
   read_host_commands();
 #else
-  read_master_commands();
+  read_slave_bus_messages();
 #endif
 
   // update the sections
-  /*for (Section *section : sections)
+  for (Section *section : sections)
   {
     section->update(events);
-  }*/
+  }
 
   // section16.update(events);
   // section15.update(events);
@@ -229,7 +233,7 @@ void poll_slaves()
   LiketrainCommand cmd;
   while (slave_relay.dequeue(cmd))
   {
-    auto slave_cmd = LiketrainSlaveCommand::command(cmd);
+    auto slave_cmd = LiketrainSlaveBusMessage::master_command(cmd);
 
     ser.reset();
     slave_cmd.serialize(ser);
@@ -246,7 +250,7 @@ void poll_slaves()
     lcd.print(slave_id);
     lcd.print(": ");
 
-    auto slave_cmd = LiketrainSlaveCommand::event_poll(slave_id);
+    auto slave_cmd = LiketrainSlaveBusMessage::master_event_poll(slave_id);
 
     ser.reset();
     slave_cmd.serialize(ser);
@@ -260,15 +264,15 @@ void poll_slaves()
       continue;
     }
 
-    LiketrainSlaveResponse slave_response;
+    LiketrainSlaveBusMessage slave_response;
     slave_response.deserialize(deser);
 
-    if (slave_response.type != LiketrainSlaveResponseType::EventCount)
+    if (slave_response.type != LiketrainSlaveBusMessageType::SlaveEventCount)
     {
       continue;
     }
 
-    auto event_count = slave_response.data.event_count.event_count;
+    auto event_count = slave_response.data.slave_event_count.event_count;
 
     lcd.print(event_count);
 
@@ -278,31 +282,20 @@ void poll_slaves()
 
       if (!rs485_serial.await_frame(deser, 50))
       {
+        lcd.print("Timeout");
         // timeout
         break;
       }
 
-      LiketrainSlaveResponse slave_event_response;
+      LiketrainSlaveBusMessage slave_event_response;
       slave_event_response.deserialize(deser);
 
-      if (slave_id == 2) {
-        char buffer[32];
-
-        snprintf(buffer, sizeof(buffer), "Slave 2 response type: %d", static_cast<uint8_t>(slave_event_response.type));
-        auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
-
-        ser.reset();
-        response.serialize(ser);
-
-        usb_serial.write_frame(ser);
-      }
-
-      if (slave_event_response.type != LiketrainSlaveResponseType::Event)
+      if (slave_event_response.type != LiketrainSlaveBusMessageType::SlaveEvent)
       {
         break;
       }
 
-      events.enqueue(*slave_event_response.data.event.event);
+      events.enqueue(*slave_event_response.data.slave_event.event);
     }
   }
 }
@@ -339,31 +332,31 @@ void send_ack_to_host()
 }
 
 #else
-void read_master_commands()
+void read_slave_bus_messages()
 {
   rs485_serial.update();
 
   while (rs485_serial.read_frame(deser))
   {
-    LiketrainSlaveCommand cmd;
-    cmd.deserialize(deser);
+    LiketrainSlaveBusMessage bus_message;
+    bus_message.deserialize(deser);
 
-    switch (cmd.type)
+    switch (bus_message.type)
     {
-    case LiketrainSlaveCommandType::Invalid:
+    case LiketrainSlaveBusMessageType::Invalid:
       // shouldn't happen
       break;
-    case LiketrainSlaveCommandType::Command:
-      handle_command(*cmd.data.command.command);
+    case LiketrainSlaveBusMessageType::MasterCommand:
+      handle_command(*bus_message.data.master_command.command);
       break;
-    case LiketrainSlaveCommandType::EventPoll:
-      if (slave_id.get() != cmd.data.event_poll.slave_id)
+    case LiketrainSlaveBusMessageType::MasterEventPoll:
+      if (slave_id.get() != bus_message.data.master_event_poll.slave_id)
       {
         // not for me
         break;
       }
 
-      auto response = LiketrainSlaveResponse::event_count(events.size());
+      auto response = LiketrainSlaveBusMessage::slave_event_count(events.size());
 
       if (events.size() > 0) {
         Serial.println("got more than 0 events, sending event count");
@@ -377,7 +370,7 @@ void read_master_commands()
       LiketrainEvent evt;
       while (events.dequeue(evt))
       {
-        auto event_response = LiketrainSlaveResponse::event(evt);
+        auto event_response = LiketrainSlaveBusMessage::slave_event(evt);
         ser.reset();
         event_response.serialize(ser);
 

@@ -33,7 +33,7 @@ public:
         strncpy((char *)this->switch_id, switch_id_str, SWITCH_ID_LEN);
     }
 
-    inline void init() { relais.init(); }
+    void init() { relais.init(); }
 
     inline const SwitchId *id() const { return &switch_id; }
     inline bool matches_id(const SwitchId &other_id) const { return memcmp(switch_id, other_id, SWITCH_ID_LEN) == 0; }
@@ -43,10 +43,10 @@ public:
         switch (state)
         {
         case SwitchState::Left:
-            relais.on();
+            relais.off();
             break;
         case SwitchState::Right:
-            relais.off();
+            relais.on();
             break;
         }
     }
