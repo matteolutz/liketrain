@@ -12,35 +12,35 @@
 /* -------------------------------- Sections -------------------------------- */
 Section section24(
     24,
-    SectionPowerRelais(3, 52, 50, 58),
+    SectionPowerRelais(Relais(3, LOW), Relais(52, LOW), Relais(50, LOW), Relais(58, LOW)),
     A15);
 Section section5(
     5,
-    SectionPowerRelais(46, 44, 42, 40),
+    SectionPowerRelais(Relais(46, LOW), Relais(44, LOW), Relais(42, LOW), Relais(40, LOW)),
     A14);
 Section section21(
     21,
-    SectionPowerRelais(38, 36, 34, 32),
+    SectionPowerRelais(Relais(38, LOW), Relais(36, LOW), Relais(34, LOW), Relais(32, LOW)),
     A13);
 Section section22(
     22,
-    SectionPowerRelais(30, 28, 26, 24),
+    SectionPowerRelais(Relais(30, LOW), Relais(28, LOW), Relais(26, LOW), Relais(24, LOW)),
     A12);
 Section section10(
     10,
-    SectionPowerRelais(22, 53, 51, 45),
+    SectionPowerRelais(Relais(22, LOW), Relais(53, LOW), Relais(51, LOW), Relais(45, LOW)),
     A11);
 Section section6(
     6,
-    SectionPowerRelais(47, 45, 43, 41),
+    SectionPowerRelais(Relais(47, LOW), Relais(45, LOW), Relais(43, LOW), Relais(41, LOW)),
     A9);
 Section section7(
     7,
-    SectionPowerRelais(39, 37, 35, 33),
+    SectionPowerRelais(Relais(39, LOW), Relais(37, LOW), Relais(35, LOW), Relais(33, LOW)),
     A8);
 Section section11(
     11,
-    SectionPowerRelais(31, 29, 27, 25),
+    SectionPowerRelais(Relais(31, LOW), Relais(29, LOW), Relais(27, LOW), Relais(25, LOW)),
     A10);
 
 Section *sections[] = {
@@ -70,11 +70,11 @@ Switch swtichG(
     "G",
     Relais(2));
 
-Switch switches[] = {
-    switchK,
-    swtichA,
-    switchN,
-    switchO,
-    swtichG};
+Switch* switches[] = {
+    &switchK,
+    &swtichA,
+    &switchN,
+    &switchO,
+    &swtichG};
 
 #endif // PINS_H

@@ -119,7 +119,7 @@ void DeserSerial::update()
     {
         return;
     }
-
+   
     // read all available bytes (max DESER_SERIAL_BUFFER_SIZE at a time) into the rx_buffer
     size_t bytes_read = serial_read_bytes(rx_buffer, min(DESER_SERIAL_BUFFER_SIZE, available));
 

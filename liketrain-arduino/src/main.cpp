@@ -84,6 +84,8 @@ void setup()
   switch_master.init();
 
   usb_serial.init();
+#else
+  Serial.begin(115200);
 #endif
 
   rs485_serial.init();
@@ -153,9 +155,9 @@ void loop()
     section->update(events);
   }*/
 
-  section16.update(events);
-  section15.update(events);
-  section14.update(events);
+  // section16.update(events);
+  // section15.update(events);
+  // section14.update(events);
 
 #if false
 #ifdef IS_MASTER
@@ -235,8 +237,15 @@ void poll_slaves()
     rs485_serial.write_frame(ser);
   }
 
+  lcd.clear();
+
   for (uint32_t slave_id = 1; slave_id <= SLAVE_COUNT; slave_id++)
   {
+    lcd.setCursor(0, slave_id - 1);
+    lcd.print("S");
+    lcd.print(slave_id);
+    lcd.print(": ");
+
     auto slave_cmd = LiketrainSlaveCommand::event_poll(slave_id);
 
     ser.reset();
@@ -246,6 +255,7 @@ void poll_slaves()
 
     if (!rs485_serial.await_frame(deser, 50))
     {
+      lcd.print("Timeout");
       // timeout
       continue;
     }
@@ -260,8 +270,6 @@ void poll_slaves()
 
     auto event_count = slave_response.data.event_count.event_count;
 
-    lcd.setCursor(0, 0);
-    lcd.print("S.Cnt: ");
     lcd.print(event_count);
 
     // get as many events as the slave has, or until a timeout occurs
@@ -276,6 +284,19 @@ void poll_slaves()
 
       LiketrainSlaveResponse slave_event_response;
       slave_event_response.deserialize(deser);
+
+      if (slave_id == 2) {
+        char buffer[32];
+
+        snprintf(buffer, sizeof(buffer), "Slave 2 response type: %d", static_cast<uint8_t>(slave_event_response.type));
+        auto response = LiketrainResponse::debug_message(buffer, strlen(buffer));
+
+        ser.reset();
+        response.serialize(ser);
+
+        usb_serial.write_frame(ser);
+      }
+
       if (slave_event_response.type != LiketrainSlaveResponseType::Event)
       {
         break;
@@ -343,6 +364,10 @@ void read_master_commands()
       }
 
       auto response = LiketrainSlaveResponse::event_count(events.size());
+
+      if (events.size() > 0) {
+        Serial.println("got more than 0 events, sending event count");
+      }
 
       ser.reset();
       response.serialize(ser);
