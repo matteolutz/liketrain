@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod state;
+use itertools::Itertools;
 use liketrain_hardware::{
     command::HardwareCommand,
     event::{HardwareEvent, HardwareSectionPower, HardwareSwitchId, SectionEventType},
@@ -628,7 +629,85 @@ impl Controller {
         Ok(())
     }
 
-    pub fn start(&mut self) -> Result<(), ControllerError> {
+    fn test_switch(switch_id: SwitchId, ctx: EventExecutionContext) -> Result<(), ControllerError> {
+        log::debug!("Testing switch: {}", switch_id);
+
+        ctx.exec(HardwareCommand::SetSwitchState {
+            switch_id: HardwareSwitchId::try_from(switch_id.clone()).unwrap(),
+            state: liketrain_hardware::event::HardwareSwitchState::Right,
+        })?;
+        std::thread::sleep(Duration::from_secs(2));
+        ctx.exec(HardwareCommand::SetSwitchState {
+            switch_id: HardwareSwitchId::try_from(switch_id.clone()).unwrap(),
+            state: liketrain_hardware::event::HardwareSwitchState::Left,
+        })?;
+
+        std::thread::sleep(Duration::from_secs(5));
+
+        Ok(())
+    }
+
+    fn test_switches(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
+        for (switch_id, _) in self
+            .track
+            .switches()
+            .sorted_by_key(|(switch_id, _)| *switch_id)
+        {
+            Self::test_switch(switch_id.clone(), ctx)?;
+        }
+
+        Ok(())
+    }
+
+    fn test_section(
+        section_id: SectionId,
+        ctx: EventExecutionContext,
+    ) -> Result<(), ControllerError> {
+        log::debug!("Testing section: {}", section_id);
+
+        ctx.exec(HardwareCommand::SetSectionPower {
+            section_id: section_id.as_u32(),
+            power: HardwareSectionPower::Quarter,
+        })?;
+        std::thread::sleep(Duration::from_secs(1));
+        ctx.exec(HardwareCommand::SetSectionPower {
+            section_id: section_id.as_u32(),
+            power: HardwareSectionPower::Half,
+        })?;
+        std::thread::sleep(Duration::from_secs(1));
+        ctx.exec(HardwareCommand::SetSectionPower {
+            section_id: section_id.as_u32(),
+            power: HardwareSectionPower::ThreeQuarters,
+        })?;
+        std::thread::sleep(Duration::from_secs(1));
+        ctx.exec(HardwareCommand::SetSectionPower {
+            section_id: section_id.as_u32(),
+            power: HardwareSectionPower::Full,
+        })?;
+        std::thread::sleep(Duration::from_secs(1));
+        ctx.exec(HardwareCommand::SetSectionPower {
+            section_id: section_id.as_u32(),
+            power: HardwareSectionPower::Off,
+        })?;
+
+        std::thread::sleep(Duration::from_secs(5));
+
+        Ok(())
+    }
+
+    fn test_sections(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
+        for (section_id, _) in self
+            .track
+            .sections()
+            .sorted_by_key(|(section_id, _)| section_id.as_u32())
+        {
+            Self::test_section(section_id, ctx)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn start(mut self) -> Result<(), ControllerError> {
         let (command_tx, command_rx) = crossbeam::channel::unbounded();
         let (event_tx, event_rx) = crossbeam::channel::unbounded();
 
@@ -648,6 +727,14 @@ impl Controller {
 
         // initialize the controller
         self.init(ctx)?;
+
+        // test the sections
+        self.test_sections(ctx)?;
+        // Self::test_section(26_usize.into(), ctx)?;
+
+        // test the switches
+        self.test_switches(ctx)?;
+        // Self::test_switch("O".into(), ctx)?;
 
         // main loop
         loop {

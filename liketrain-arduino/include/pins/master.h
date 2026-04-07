@@ -12,7 +12,7 @@
 /* -------------------------------- Sections -------------------------------- */
 Section section20(
     20,
-    SectionPowerRelais(Relais(26, LOW), Relais(28, LOW), Relais(30, LOW), Relais(20, LOW)),
+    SectionPowerRelais(Relais(26, LOW), Relais(28, LOW), Relais(30, LOW), Relais(32, LOW)),
     A14);
 Section section3(
     3,
@@ -68,13 +68,13 @@ Switch switchE(
     Relais(5));
 Switch swtichI(
     "I",
-    Relais(6, LOW));
-Switch switchO(
-    "O",
-    Relais(7));
+    Relais(6));
+Switch switchD(
+    "D",
+    Relais(7, LOW));
 Switch switchL(
     "L",
-    Relais(24));
+    Relais(24, LOW));
 
 Switch* switches[] = {
     &switchH,
@@ -82,7 +82,7 @@ Switch* switches[] = {
     &switchF,
     &switchE,
     &swtichI,
-    &switchO,
+    &switchD,
     &switchL};
 
 SwitchMaster switch_master(Relais(22));
