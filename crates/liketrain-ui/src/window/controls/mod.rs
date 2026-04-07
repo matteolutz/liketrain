@@ -9,10 +9,12 @@ use gpui_component::{
 };
 
 use crate::{
-    app_ext::GpuiContextExtension, controller::ControllerUiWrapper,
-    window::controls::section::SectionsTab,
+    app_ext::GpuiContextExtension,
+    controller::ControllerUiWrapper,
+    window::controls::{logs::LogsTab, section::SectionsTab},
 };
 
+mod logs;
 mod section;
 
 pub struct ControlsWindow {
@@ -70,10 +72,12 @@ impl Render for ControlsWindow {
                         cx.notify();
                     }))
                     .child(Tab::new().label("Sections"))
-                    .child(Tab::new().label("Switches")),
+                    .child(Tab::new().label("Switches"))
+                    .child(Tab::new().label("Logs")),
             )
             .when(true, |this| match self.selected_tab {
                 0 => this.child(self.sections_tab.clone()),
+                2 => this.child(LogsTab),
                 _ => this,
             })
     }

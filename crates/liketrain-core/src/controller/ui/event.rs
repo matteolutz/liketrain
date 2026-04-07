@@ -1,4 +1,7 @@
-use liketrain_hardware::event::{HardwareSectionPower, SectionEvent};
+use liketrain_hardware::{
+    command::HardwareCommand,
+    event::{HardwareSectionPower, SectionEvent},
+};
 
 use crate::{SectionId, SwitchId, SwitchState, TrainId};
 
@@ -47,6 +50,7 @@ pub enum UiEvent {
     UiSectionEvent(UiSectionEvent),
     UiSwitchEvent(UiSwitchEvent),
     UiTrainEvent(UiTrainEvent),
+    HardwareCommand(HardwareCommand),
 }
 
 impl From<UiSectionEvent> for UiEvent {

@@ -2,7 +2,7 @@ use crate::event::{HardwareSectionPower, HardwareSwitchId, HardwareSwitchState};
 
 pub mod deser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum HardwareCommand {
     Ping {
         slave_id: u32,

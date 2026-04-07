@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::mpsc, time::Duration};
 
-use gpui::{App, AppContext, BorrowAppContext, Context, Entity, EventEmitter, Global, Task};
+use gpui::{
+    App, AppContext, BorrowAppContext, Context, Entity, EventEmitter, Global, SharedString, Task,
+};
 use liketrain_core::{
     Controller, ControllerConfig, ControllerError, SectionId, SwitchId, SwitchState, Track,
     TrainData, TrainId,
@@ -11,6 +13,26 @@ use liketrain_core::{
 mod section;
 pub use section::*;
 
+#[derive(Debug)]
+pub enum ControllerUiLogType {
+    UiEvent,
+}
+
+#[derive(Debug)]
+pub struct ControllerUiLog {
+    pub log_type: ControllerUiLogType,
+    pub message: SharedString,
+}
+
+impl ControllerUiLog {
+    fn ui_event(event: &UiEvent) -> Self {
+        Self {
+            log_type: ControllerUiLogType::UiEvent,
+            message: SharedString::from(format!("{:?}", event)),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct ControllerUiWrapperState {
     track: Track,
@@ -18,6 +40,8 @@ pub struct ControllerUiWrapperState {
 
     section_states: HashMap<SectionId, UiSectionState>,
     switch_states: HashMap<SwitchId, SwitchState>,
+
+    logs: Vec<ControllerUiLog>,
 }
 
 impl EventEmitter<UiEvent> for ControllerUiWrapperState {}
@@ -33,6 +57,10 @@ impl ControllerUiWrapperState {
 
     pub fn train(&self, train_id: TrainId) -> Option<&TrainData> {
         self.trains.get(&train_id)
+    }
+
+    pub fn logs(&self) -> &[ControllerUiLog] {
+        &self.logs
     }
 }
 
@@ -62,17 +90,17 @@ impl ControllerUiWrapperState {
                     )
                 })
                 .collect(),
+            logs: Vec::new(),
         }
     }
 
-    fn handle_section_event(&mut self, section_event: UiSectionEvent, cx: &mut Context<Self>) {
+    fn handle_section_event(&mut self, section_event: UiSectionEvent) {
         match section_event {
             UiSectionEvent::Occupied {
                 section_id,
                 train_id,
             } => {
                 self.section_states.entry(section_id).or_default().occupant = train_id;
-                cx.notify();
             }
             UiSectionEvent::Reserved {
                 section_id,
@@ -82,11 +110,9 @@ impl ControllerUiWrapperState {
                     .entry(section_id)
                     .or_default()
                     .reserved_by = train_id;
-                cx.notify();
             }
             UiSectionEvent::SetPower { section_id, power } => {
                 self.section_states.entry(section_id).or_default().power = power;
-                cx.notify();
             }
             UiSectionEvent::QueueEnqueued {
                 section_id,
@@ -97,7 +123,6 @@ impl ControllerUiWrapperState {
                     .or_default()
                     .queue
                     .push_back(train_id);
-                cx.notify();
             }
             UiSectionEvent::QueueDequeued {
                 section_id,
@@ -108,31 +133,34 @@ impl ControllerUiWrapperState {
                     .or_default()
                     .queue
                     .retain(|id| id != &train_id);
-                cx.notify();
             }
             UiSectionEvent::HardwareSectionEvent(_) => {}
         }
     }
 
-    fn handle_switch_event(&mut self, switch_event: UiSwitchEvent, cx: &mut Context<Self>) {
+    fn handle_switch_event(&mut self, switch_event: UiSwitchEvent) {
         match switch_event {
             UiSwitchEvent::SetState { id, state } => {
                 self.switch_states.insert(id, state);
-                cx.notify();
             }
         }
     }
 
-    fn handle_train_event(&mut self, _train_event: UiTrainEvent, _cx: &mut Context<Self>) {
+    fn handle_train_event(&mut self, _train_event: UiTrainEvent) {
         // TODO
     }
 
     fn handle_event(&mut self, event: UiEvent, cx: &mut Context<Self>) {
+        // add to logs
+        self.logs.push(ControllerUiLog::ui_event(&event));
+        cx.notify();
+
         // update own state based on event
         match event.clone() {
-            UiEvent::UiSectionEvent(section_event) => self.handle_section_event(section_event, cx),
-            UiEvent::UiSwitchEvent(switch_event) => self.handle_switch_event(switch_event, cx),
-            UiEvent::UiTrainEvent(train_event) => self.handle_train_event(train_event, cx),
+            UiEvent::UiSectionEvent(section_event) => self.handle_section_event(section_event),
+            UiEvent::UiSwitchEvent(switch_event) => self.handle_switch_event(switch_event),
+            UiEvent::UiTrainEvent(train_event) => self.handle_train_event(train_event),
+            UiEvent::HardwareCommand(_) => {}
         }
 
         // and then also emit the event to any listeners
