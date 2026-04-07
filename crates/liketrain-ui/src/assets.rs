@@ -8,6 +8,7 @@ pub fn init(cx: &mut App) -> gpui::Result<()> {
 #[derive(rust_embed::RustEmbed)]
 #[folder = "./assets"]
 #[include = "fonts/**/*.ttf"]
+#[include = "icons/**/*.svg"]
 pub struct Assets;
 
 impl AssetSource for Assets {

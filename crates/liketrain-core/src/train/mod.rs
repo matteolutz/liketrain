@@ -31,8 +31,13 @@ impl From<u32> for TrainId {
 }
 
 #[derive(Debug, Clone)]
+pub struct TrainData {
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Train {
-    name: String,
+    data: TrainData,
 
     mode: TrainDrivingMode,
 }
@@ -40,15 +45,19 @@ pub struct Train {
 impl Train {
     pub fn from_route(name: impl Into<String>, route: Route) -> Self {
         Self {
-            name: name.into(),
+            data: TrainData { name: name.into() },
             mode: route.into(),
         }
     }
 }
 
 impl Train {
+    pub fn data(&self) -> &TrainData {
+        &self.data
+    }
+
     pub fn name(&self) -> &str {
-        &self.name
+        &self.data.name
     }
 
     pub fn driving_mode(&self) -> &TrainDrivingMode {

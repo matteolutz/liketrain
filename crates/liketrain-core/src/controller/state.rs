@@ -13,8 +13,8 @@ impl SectionState {
         self.occupied.is_some()
     }
 
-    pub fn occupant(&self) -> Option<&TrainId> {
-        self.occupied.as_ref()
+    pub fn occupant(&self) -> Option<TrainId> {
+        self.occupied
     }
 
     pub fn power(&self) -> HardwareSectionPower {

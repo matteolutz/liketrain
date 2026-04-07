@@ -2,9 +2,16 @@ use gpui::{
     AppContext, Context, Entity, ParentElement, Render, Styled, Subscription, Window, div,
     prelude::FluentBuilder,
 };
-use gpui_component::tab::{Tab, TabBar};
+use gpui_component::{
+    Disableable, WindowExt,
+    button::Button,
+    tab::{Tab, TabBar},
+};
 
-use crate::{controller::ControllerUiWrapper, window::controls::section::SectionsTab};
+use crate::{
+    app_ext::GpuiContextExtension, controller::ControllerUiWrapper,
+    window::controls::section::SectionsTab,
+};
 
 mod section;
 
@@ -18,12 +25,7 @@ pub struct ControlsWindow {
 
 impl ControlsWindow {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let _subscriptions = vec![cx.subscribe(
-            &ControllerUiWrapper::event_emitter(cx).clone(),
-            |_, _, _, cx| {
-                cx.notify();
-            },
-        )];
+        let _subscriptions = vec![cx.observe_and_notify(&ControllerUiWrapper::state(cx).clone())];
 
         let sections_tab = cx.new(|cx| SectionsTab::new(window, cx));
 
@@ -45,6 +47,21 @@ impl Render for ControlsWindow {
             .size_full()
             .flex()
             .flex_col()
+            .child(
+                Button::new("start")
+                    .label("Start")
+                    .disabled(!ControllerUiWrapper::can_start(cx))
+                    .on_click(|_, window, cx| {
+                        if !ControllerUiWrapper::can_start(cx) {
+                            return;
+                        }
+
+                        if let Err(err) = ControllerUiWrapper::start(cx) {
+                            window.push_notification(err.to_string(), cx);
+                            log::warn!("Failed to start: {}", err);
+                        }
+                    }),
+            )
             .child(
                 TabBar::new("tabs")
                     .selected_index(self.selected_tab)

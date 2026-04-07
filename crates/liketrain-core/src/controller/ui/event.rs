@@ -13,6 +13,11 @@ pub enum UiSectionEvent {
         train_id: TrainId,
     },
 
+    Occupied {
+        section_id: SectionId,
+        train_id: Option<TrainId>,
+    },
+
     Reserved {
         section_id: SectionId,
         train_id: Option<TrainId>,

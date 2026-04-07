@@ -78,10 +78,18 @@ impl Controller {
         ui_command_rx: crossbeam::channel::Receiver<UiCommand>,
     ) -> Self {
         Self {
+            section_states: config
+                .track
+                .sections()
+                .map(|(section_id, _)| (section_id, SectionState::default()))
+                .collect(),
+            switch_states: config
+                .track
+                .switches()
+                .map(|(switch_id, _)| (switch_id.clone(), SwitchState::default()))
+                .collect(),
             track: config.track,
             trains: config.trains,
-            section_states: HashMap::new(),
-            switch_states: HashMap::new(),
             scheduler: Scheduler::default(),
             section_queues: HashMap::new(),
             section_reservations: HashMap::new(),
@@ -89,6 +97,10 @@ impl Controller {
             ui_event_tx,
             ui_command_rx,
         }
+    }
+
+    pub fn trains(&self) -> impl Iterator<Item = (TrainId, &Train)> {
+        self.trains.iter().map(|(id, train)| (*id, train))
     }
 
     pub fn train(&self, train_id: TrainId) -> Result<&Train, ControllerError> {
@@ -107,8 +119,22 @@ impl Controller {
         &self.track
     }
 
-    pub fn section_state(&self, section_id: SectionId) -> Option<&SectionState> {
-        self.section_states.get(&section_id)
+    pub fn switch_states(&self) -> impl Iterator<Item = (SwitchId, SwitchState)> {
+        self.switch_states
+            .iter()
+            .map(|(id, state)| (id.clone(), *state))
+    }
+
+    pub fn section_states(&self) -> impl Iterator<Item = (SectionId, &SectionState)> {
+        self.section_states.iter().map(|(id, state)| (*id, state))
+    }
+
+    pub fn section_reservation(&self, section_id: SectionId) -> Option<TrainId> {
+        self.section_reservations.get(&section_id).copied()
+    }
+
+    pub fn section_queue(&self, section_id: SectionId) -> Option<&VecDeque<TrainId>> {
+        self.section_queues.get(&section_id)
     }
 }
 
@@ -304,6 +330,11 @@ impl Controller {
                 train_id,
                 section_id: current_section_id,
             } => {
+                self.emit_ui(UiSectionEvent::Occupied {
+                    section_id: current_section_id,
+                    train_id: Some(train_id),
+                });
+
                 let train = self.train(train_id)?;
 
                 if let Some(transition) = train.get_transition_to_next_section().cloned() {
@@ -361,6 +392,10 @@ impl Controller {
                 train_id,
                 section_id,
             } => {
+                self.emit_ui(UiSectionEvent::Occupied {
+                    section_id,
+                    train_id: None,
+                });
                 self.release_reservation(section_id, train_id);
 
                 while let Some(waiting_train_id) = self

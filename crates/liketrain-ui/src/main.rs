@@ -76,7 +76,7 @@ fn main() {
 
     log::info!("layout: {:#?}", resolved_layout);
 
-    let test_route = Route::new("RE5", [24_usize, 22, 21, 24], Direction::Forward, &track).unwrap();
+    let test_route = Route::new("RE5", [16_usize, 15], Direction::Forward, &track).unwrap();
     let test_train = Train::from_route("4218", test_route);
 
     let controller_config = ControllerConfig {
@@ -86,7 +86,7 @@ fn main() {
             .collect(),
     };
 
-    let hardware_comm = SerialControllerHardwareCommunication::new("test", 115200);
+    let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
 
     gpui_platform::application()
         .with_assets(assets::Assets)

@@ -2,7 +2,6 @@ use gpui::{AppContext, Context, Entity, Render, Subscription, Window};
 use gpui_component::table::TableState;
 use liketrain_core::{
     SectionId,
-    hardware::event::HardwareSectionPower,
     ui::{UiEvent, UiSectionEvent},
 };
 
@@ -22,33 +21,40 @@ pub struct SectionsTab {
 impl SectionsTab {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let table_state = cx.new(|cx| {
-            let controller = ControllerUiWrapper::controller(cx);
+            let controller_state = ControllerUiWrapper::state(cx).read(cx);
             TableState::new(
-                SectionsTableDelegate::new(controller.track().sections().map(|(section_id, _)| {
-                    SectionsTableData {
+                SectionsTableDelegate::new(controller_state.section_states().map(
+                    |(section_id, state)| SectionsTableData {
                         id: section_id,
-                        occupant: None,
-                        reservation: None,
-                        queue: vec![],
-                        power: controller
-                            .section_state(section_id)
-                            .map(|state| state.power())
-                            .unwrap_or_default(),
-                    }
-                })),
+                        occupant: state.occupant,
+                        reservation: state.reserved_by,
+                        queue: state.queue.iter().copied().collect(),
+                        power: state.power,
+                    },
+                )),
                 window,
                 cx,
             )
         });
 
         let _subscriptions = vec![cx.subscribe(
-            &ControllerUiWrapper::event_emitter(cx).clone(),
+            &ControllerUiWrapper::state(cx).clone(),
             |this, _, evt, cx| match evt {
                 UiEvent::UiSectionEvent(section_event) => match section_event {
-                    &UiSectionEvent::SetPower { section_id, power } => {
-                        this.set_section_power(section_id, power, cx)
+                    &UiSectionEvent::SetPower { section_id, .. } => {
+                        this.update_section_power(section_id, cx)
                     }
-                    _ => {}
+                    &UiSectionEvent::Occupied { section_id, .. } => {
+                        this.update_section_occupant(section_id, cx)
+                    }
+                    &UiSectionEvent::Reserved { section_id, .. } => {
+                        this.update_section_reservation(section_id, cx)
+                    }
+                    &UiSectionEvent::QueueDequeued { section_id, .. }
+                    | &UiSectionEvent::QueueEnqueued { section_id, .. } => {
+                        this.update_section_queue(section_id, cx)
+                    }
+                    UiSectionEvent::HardwareSectionEvent(_) => {}
                 },
                 _ => {}
             },
@@ -60,14 +66,35 @@ impl SectionsTab {
         }
     }
 
-    fn set_section_power(
-        &self,
-        section_id: SectionId,
-        power: HardwareSectionPower,
-        cx: &mut Context<Self>,
-    ) {
+    fn update_section_power(&self, section_id: SectionId, cx: &mut Context<Self>) {
         self.table_state.update(cx, |state, cx| {
-            state.delegate_mut().set_section_power(section_id, power);
+            state.delegate_mut().update_section_power(section_id, cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn update_section_occupant(&self, section_id: SectionId, cx: &mut Context<Self>) {
+        self.table_state.update(cx, |state, cx| {
+            state.delegate_mut().update_section_occupant(section_id, cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn update_section_reservation(&self, section_id: SectionId, cx: &mut Context<Self>) {
+        self.table_state.update(cx, |state, cx| {
+            state
+                .delegate_mut()
+                .update_section_reservation(section_id, cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn update_section_queue(&self, section_id: SectionId, cx: &mut Context<Self>) {
+        self.table_state.update(cx, |state, cx| {
+            state.delegate_mut().update_section_queue(section_id, cx);
             cx.notify();
         });
         cx.notify();

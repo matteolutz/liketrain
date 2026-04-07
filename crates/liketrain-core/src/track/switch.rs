@@ -48,8 +48,9 @@ impl std::fmt::Display for SwitchId {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SwitchState {
+    #[default]
     Left,
     Right,
 }
