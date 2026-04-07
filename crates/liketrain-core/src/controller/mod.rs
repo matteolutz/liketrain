@@ -201,7 +201,8 @@ impl Controller {
     }
 
     fn is_section_reserved_by_other(&self, section_id: SectionId, train_id: TrainId) -> bool {
-        self.section_reservations
+        self.read_state()
+            .section_reservations
             .get(&section_id)
             .is_some_and(|&holder| holder != train_id)
     }
@@ -601,7 +602,7 @@ impl Controller {
         ctx.exec(HardwareCommand::ResetAll)?;
 
         // initialize all the trains
-        for (_, train) in &self.trains {
+        for (_, train) in &self.read_state().trains {
             let Some(initial_section) = train.get_initial_section() else {
                 continue;
             };
@@ -649,6 +650,7 @@ impl Controller {
 
     fn test_switches(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
         for (switch_id, _) in self
+            .read_state()
             .track
             .switches()
             .sorted_by_key(|(switch_id, _)| *switch_id)
@@ -697,6 +699,7 @@ impl Controller {
 
     fn test_sections(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
         for (section_id, _) in self
+            .read_state()
             .track
             .sections()
             .sorted_by_key(|(section_id, _)| section_id.as_u32())
