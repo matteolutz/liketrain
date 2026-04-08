@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, AppContext, Bounds, IntoElement, ParentElement, SharedString, Styled, WindowBounds,
-    WindowOptions, div,
+    App, AppContext, Bounds, InteractiveElement, IntoElement, ParentElement, SharedString, Styled,
+    WindowBounds, WindowOptions,
 };
 use gpui_component::{
-    ActiveTheme,
+    ActiveTheme, IconName,
     button::Button,
+    h_flex,
     menu::{DropdownMenu, PopupMenuItem},
     table::{Column, ColumnSort, TableDelegate},
 };
@@ -147,6 +148,15 @@ impl TableDelegate for TrainsTableDelegate {
         }
     }
 
+    fn render_tr(
+        &mut self,
+        row_ix: usize,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<gpui_component::table::TableState<Self>>,
+    ) -> gpui::Stateful<gpui::Div> {
+        h_flex().id(("row", row_ix)).h_10()
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
@@ -158,14 +168,21 @@ impl TableDelegate for TrainsTableDelegate {
         let col = &self.columns[col_ix];
 
         match col.key.as_str() {
-            "id" => row.id.to_string().into_any_element(),
-            "name" => row.name.clone().into_any_element(),
-            "section" => row
-                .current_section
-                .map(|section_id| format!("S{}", section_id))
-                .unwrap_or_else(|| "-".to_string())
+            "id" => h_flex()
+                .h_full()
+                .child(row.id.to_string())
                 .into_any_element(),
-            "state" => div()
+            "name" => h_flex().h_full().child(row.name.clone()).into_any_element(),
+            "section" => h_flex()
+                .h_full()
+                .child(
+                    row.current_section
+                        .map(|section_id| format!("S{}", section_id))
+                        .unwrap_or_else(|| "-".to_string()),
+                )
+                .into_any_element(),
+            "state" => h_flex()
+                .h_full()
                 .child(format!("{:?}", row.state))
                 .text_color(match row.state {
                     TrainState::Default => cx.theme().success,
@@ -173,7 +190,7 @@ impl TableDelegate for TrainsTableDelegate {
                 })
                 .into_any_element(),
             "speed" => Button::new("speed")
-                .size_full()
+                .icon(IconName::ChevronDown)
                 .label(format!("{:?}", row.speed))
                 .dropdown_menu({
                     let current_speed = row.speed;
@@ -202,8 +219,8 @@ impl TableDelegate for TrainsTableDelegate {
                 })
                 .into_any_element(),
             "ebula" => Button::new("ebula")
+                .icon(IconName::ExternalLink)
                 .label("EBuLa")
-                .size_full()
                 .on_click({
                     let train_id = row.id;
 

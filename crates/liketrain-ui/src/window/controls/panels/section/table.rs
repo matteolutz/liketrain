@@ -1,9 +1,12 @@
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
+use gpui::{
+    App, InteractiveElement, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder,
+};
 use gpui_component::{
-    ActiveTheme,
+    ActiveTheme, IconName,
     button::Button,
+    h_flex,
     menu::{DropdownMenu, PopupMenuItem},
     table::{Column, ColumnSort, TableDelegate},
 };
@@ -154,6 +157,15 @@ impl TableDelegate for SectionsTableDelegate {
         }
     }
 
+    fn render_tr(
+        &mut self,
+        row_ix: usize,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<gpui_component::table::TableState<Self>>,
+    ) -> gpui::Stateful<gpui::Div> {
+        h_flex().id(("row", row_ix)).h_10()
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
@@ -165,51 +177,63 @@ impl TableDelegate for SectionsTableDelegate {
         let col = &self.columns[col_ix];
 
         match col.key.as_str() {
-            "id" => format!("S{}", row.id).into_any_element(),
-            "occupant" => row
-                .occupant
-                .train_id()
-                .map(|(id, was_freed)| {
-                    div()
-                        .when(was_freed, |this| this.text_color(cx.theme().danger))
-                        .when(!was_freed, |this| this.text_color(cx.theme().success))
-                        .child(
+            "id" => h_flex()
+                .h_full()
+                .child(format!("S{}", row.id))
+                .into_any_element(),
+            "occupant" => h_flex()
+                .h_full()
+                .child(
+                    row.occupant
+                        .train_id()
+                        .map(|(id, was_freed)| {
+                            div()
+                                .when(was_freed, |this| this.text_color(cx.theme().danger))
+                                .when(!was_freed, |this| this.text_color(cx.theme().success))
+                                .child(
+                                    ControllerUiWrapper::state(cx)
+                                        .read(cx)
+                                        .train(id)
+                                        .map(|train| train.data.name.clone())
+                                        .unwrap_or_else(|| id.to_string()),
+                                )
+                        })
+                        .unwrap_or_else(|| div().child("-".to_string())),
+                )
+                .into_any_element(),
+            "reservation" => h_flex()
+                .h_full()
+                .child(
+                    row.reservation
+                        .as_ref()
+                        .map(|id| {
                             ControllerUiWrapper::state(cx)
                                 .read(cx)
-                                .train(id)
+                                .train(*id)
                                 .map(|train| train.data.name.clone())
-                                .unwrap_or_else(|| id.to_string()),
-                        )
-                })
-                .unwrap_or_else(|| div().child("-".to_string()))
+                                .unwrap_or_else(|| id.to_string())
+                        })
+                        .unwrap_or_else(|| "-".to_string()),
+                )
                 .into_any_element(),
-            "reservation" => row
-                .reservation
-                .as_ref()
-                .map(|id| {
-                    ControllerUiWrapper::state(cx)
-                        .read(cx)
-                        .train(*id)
-                        .map(|train| train.data.name.clone())
-                        .unwrap_or_else(|| id.to_string())
-                })
-                .unwrap_or_else(|| "-".to_string())
-                .into_any_element(),
-            "queue" => row
-                .queue
-                .iter()
-                .map(|id| {
-                    ControllerUiWrapper::state(cx)
-                        .read(cx)
-                        .train(*id)
-                        .map(|train| train.data.name.clone())
-                        .unwrap_or_else(|| id.to_string())
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
+            "queue" => h_flex()
+                .h_full()
+                .child(
+                    row.queue
+                        .iter()
+                        .map(|id| {
+                            ControllerUiWrapper::state(cx)
+                                .read(cx)
+                                .train(*id)
+                                .map(|train| train.data.name.clone())
+                                .unwrap_or_else(|| id.to_string())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
                 .into_any_element(),
             "power" => Button::new("power")
-                .size_full()
+                .icon(IconName::ChevronDown)
                 .label(format!("{:?}", row.power))
                 .dropdown_menu({
                     let current_power = row.power;

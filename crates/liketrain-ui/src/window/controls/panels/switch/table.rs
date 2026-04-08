@@ -1,8 +1,10 @@
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, Styled};
+use gpui::{App, InteractiveElement, IntoElement, ParentElement, Styled};
 use gpui_component::{
+    IconName,
     button::Button,
+    h_flex,
     menu::{DropdownMenu, PopupMenuItem},
     table::{Column, ColumnSort, TableDelegate},
 };
@@ -91,6 +93,15 @@ impl TableDelegate for SwitchesTableDelegate {
         }
     }
 
+    fn render_tr(
+        &mut self,
+        row_ix: usize,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<gpui_component::table::TableState<Self>>,
+    ) -> gpui::Stateful<gpui::Div> {
+        h_flex().id(("row", row_ix)).h_10()
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
@@ -102,9 +113,12 @@ impl TableDelegate for SwitchesTableDelegate {
         let col = &self.columns[col_ix];
 
         match col.key.as_str() {
-            "id" => row.id.to_string().into_any_element(),
+            "id" => h_flex()
+                .h_full()
+                .child(row.id.to_string())
+                .into_any_element(),
             "state" => Button::new("state")
-                .size_full()
+                .icon(IconName::ChevronDown)
                 .label(format!("{:?}", row.state))
                 .dropdown_menu({
                     let current_state = row.state;
