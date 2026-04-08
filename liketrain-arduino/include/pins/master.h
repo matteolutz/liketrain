@@ -25,11 +25,11 @@ Section section16(
 Section section15(
     15,
     SectionPowerRelais(Relais(50, LOW), Relais(52, LOW), Relais(53, LOW), Relais(51, LOW)),
-    A11);
+    A10);
 Section section8(
     8,
     SectionPowerRelais(Relais(49, LOW), Relais(47, LOW), Relais(45, LOW), Relais(43, LOW)),
-    A10);
+    A12);
 Section section2(
     2,
     SectionPowerRelais(Relais(41, LOW), Relais(39, LOW), Relais(37, LOW), Relais(35, LOW)),
@@ -37,7 +37,7 @@ Section section2(
 Section section14(
     14,
     SectionPowerRelais(Relais(33, LOW), Relais(31, LOW), Relais(29, LOW), Relais(27, LOW)),
-    A12);
+    A11);
 Section section13(
     13,
     SectionPowerRelais(Relais(25, LOW), Relais(23, LOW), Relais(14, LOW), Relais(15, LOW)),
@@ -56,7 +56,7 @@ Section *sections[] = {
 /* -------------------------------- Switches -------------------------------- */
 Switch switchH(
     "H",
-    Relais(2));
+    Relais(2), SwitchState::Right);
 Switch switchQ(
     "Q",
     Relais(3));

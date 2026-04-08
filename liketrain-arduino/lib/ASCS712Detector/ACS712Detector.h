@@ -26,6 +26,8 @@ public:
 
     void reset();
 
+    uint8_t get_pin() const { return pin; }
+
 private:
     void new_frame();
 
@@ -41,7 +43,7 @@ private:
     unsigned long last_frame_start = 0;
     const unsigned long frame_time = 20; // ms
     
-    const int enter_threshold = 40;
+    const int enter_threshold = 30;
     const int leave_threshold = 20;
 
     unsigned long last_event_time = 0;

@@ -57,7 +57,9 @@ Switch swtichM(
     Relais(3));
 Switch switchB(
     "B",
-    Relais(4));
+    Relais(4),
+    SwitchState::Right
+);
 Switch switchP(
     "P",
     Relais(5));

@@ -27,7 +27,7 @@ Queue<LiketrainCommand> slave_relay(32);
 #ifdef IS_MASTER
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 unsigned long last_debug = millis();
-const unsigned long debug_interval = 100;
+const unsigned long debug_interval = 31;
 
 DeserSerial usb_serial(Serial);
 #endif
@@ -172,7 +172,8 @@ void loop()
     lcd.setCursor(0, 0);
     lcd.print(value);*/
 
-    int peak_value = section16.get_train_detection().get_frame_peak();
+    // int peak_value = section15.get_train_detection().get_frame_peak();
+    // int peak_value = analogRead(section15.get_train_detection().get_pin());
 
     char buffer[32];
 
@@ -426,6 +427,8 @@ bool handle_command(LiketrainCommand &cmd)
 
       return true; // we handled this section, don't send cmd to slaves
     }
+
+    break;
   }
   case LiketrainCommandType::SetSwitchState:
   {
@@ -444,6 +447,8 @@ bool handle_command(LiketrainCommand &cmd)
 
       return true; // we handled this switch, don't send to slaves
     }
+
+    break;
   }
   case LiketrainCommandType::ResetAll:
   {
@@ -457,6 +462,7 @@ bool handle_command(LiketrainCommand &cmd)
       sw->reset();
     }
 
+    break;
     // don't return true, so the ResetAll command will be relayed to the slaves, which will cause them to reset as well
   }
   }
