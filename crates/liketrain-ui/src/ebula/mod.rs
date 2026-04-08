@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use gpui::{
     Context, Div, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels, Render,
@@ -7,8 +7,10 @@ use gpui::{
 };
 
 mod theme;
-use liketrain_core::{SectionTransition, SwitchId, Track, Train, TrainDrivingMode};
+use liketrain_core::{Route, SectionTransition, SwitchId, Track, TrainId};
 pub use theme::*;
+
+use crate::controller::ControllerUiWrapper;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum BorderSide {
@@ -68,8 +70,7 @@ impl EbulaEntry {
 pub struct Ebula {
     theme: EbulaTheme,
 
-    track: Rc<Track>,
-    train: Train,
+    train_id: TrainId,
 
     /// The precalculated entries. Sorted by offset.
     entries: HashMap<EbulaOffset, EbulaEntry>,
@@ -87,7 +88,7 @@ impl Ebula {
 }
 
 impl Ebula {
-    pub fn new(track: Rc<Track>, train: Train, theme: EbulaTheme, cx: &mut Context<Self>) -> Self {
+    pub fn new(train_id: TrainId, theme: EbulaTheme, cx: &mut Context<Self>) -> Self {
         let _task = cx.spawn(async |this, cx| {
             loop {
                 let now = chrono::Local::now();
@@ -104,11 +105,15 @@ impl Ebula {
         let content_scroll_handle = ScrollHandle::default();
         content_scroll_handle.scroll_to_bottom();
 
-        let entries = Self::calculate_entries(&track, &train);
+        let controller_state = ControllerUiWrapper::state(cx).read(cx);
+
+        let track = controller_state.track();
+        let train = controller_state.train(train_id).unwrap();
+
+        let entries = Self::calculate_entries(track, train.route.as_ref().unwrap());
 
         Self {
-            track,
-            train,
+            train_id,
             entries,
             theme,
             content_scroll_handle,
@@ -116,11 +121,7 @@ impl Ebula {
         }
     }
 
-    fn calculate_entries(track: &Track, train: &Train) -> HashMap<EbulaOffset, EbulaEntry> {
-        let TrainDrivingMode::Route { route, .. } = train.driving_mode() else {
-            return HashMap::new();
-        };
-
+    fn calculate_entries(track: &Track, route: &Route) -> HashMap<EbulaOffset, EbulaEntry> {
         let mut entries = HashMap::new();
         let mut current_meter_offset = 0_f32;
 
@@ -230,20 +231,24 @@ impl Ebula {
     pub fn render_header(
         &mut self,
         _window: &mut Window,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let now = chrono::Local::now();
+
+        let train_name = ControllerUiWrapper::state(cx)
+            .read(cx)
+            .train(self.train_id)
+            .unwrap()
+            .data
+            .name
+            .clone();
 
         div()
             .w_full()
             .h_10()
             .when(true, |this| self.border_bottom(this))
             .flex()
-            .child(
-                self.text_field(BorderSide::Right)
-                    .w_20()
-                    .child(self.train.name().to_string()),
-            )
+            .child(self.text_field(BorderSide::Right).w_20().child(train_name))
             .child(
                 self.text_field(BorderSide::Right)
                     .flex_1()

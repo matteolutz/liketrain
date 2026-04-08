@@ -41,8 +41,19 @@ pub enum UiSwitchEvent {
 
 #[derive(Debug, Clone)]
 pub enum UiTrainEvent {
-    Started(HardwareSectionPower),
-    Stopped,
+    Started {
+        train_id: TrainId,
+        power: HardwareSectionPower,
+    },
+
+    EnteredSection {
+        train_id: TrainId,
+        section_id: SectionId,
+    },
+
+    Stopped {
+        train_id: TrainId,
+    },
 }
 
 #[derive(Debug, Clone)]

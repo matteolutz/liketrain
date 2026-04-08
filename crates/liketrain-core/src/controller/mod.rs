@@ -6,7 +6,7 @@ use std::{
 use crate::{
     SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
-    ui::{UiCommand, UiEvent, UiSectionEvent, UiSwitchEvent},
+    ui::{UiCommand, UiEvent, UiSectionEvent, UiSwitchEvent, UiTrainEvent},
 };
 
 mod state;
@@ -336,6 +336,10 @@ impl Controller {
                 self.emit_ui(UiSectionEvent::Occupied {
                     section_id: current_section_id,
                     train_id: Some(train_id),
+                });
+                self.emit_ui(UiTrainEvent::EnteredSection {
+                    train_id,
+                    section_id: current_section_id,
                 });
 
                 let train = self.train(train_id)?;

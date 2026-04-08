@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32, rc::Rc};
+use std::{collections::HashMap, f32};
 
 use gpui::{
     Bounds, Context, InteractiveElement, MouseDownEvent, MouseMoveEvent, ParentElement,
@@ -10,6 +10,7 @@ use vek::Vec2;
 
 use crate::{
     app_ext::GpuiContextExtension,
+    controller::ControllerUiWrapper,
     layout::{
         camera::LayoutCamera,
         color::LayoutColor,
@@ -230,10 +231,9 @@ impl ResolvedLayout {
         }
     }
 
-    pub fn renderer(&self, track: &Rc<Track>, _cx: &mut Context<LayoutRenderer>) -> LayoutRenderer {
+    pub fn renderer(self, _cx: &mut Context<LayoutRenderer>) -> LayoutRenderer {
         LayoutRenderer {
-            layout: self.clone(),
-            track: track.clone(),
+            layout: self,
             camera: LayoutCamera::new(Bounds::default()),
             last_mouse_pos: None,
         }
@@ -251,7 +251,6 @@ pub struct LayoutRenderConfig {
 
 pub struct LayoutRenderer {
     layout: ResolvedLayout,
-    track: Rc<Track>,
 
     last_mouse_pos: Option<Point<Pixels>>,
 
@@ -304,8 +303,9 @@ impl Render for LayoutRenderer {
                         this.camera.screen_bounds = bounds;
                         cx.notify();
                     }),
-                    cx.paint_canvas(|this, _, _, window, _| {
-                        this.layout.render_canvas(&this.track, &this.camera, window);
+                    cx.paint_canvas(|this, _, _, window, cx| {
+                        let track = ControllerUiWrapper::state(cx).read(cx).track();
+                        this.layout.render_canvas(track, &this.camera, window);
                     }),
                 )
                 .absolute()

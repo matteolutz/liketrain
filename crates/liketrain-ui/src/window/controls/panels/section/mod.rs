@@ -1,5 +1,10 @@
-use gpui::{AppContext, Context, Entity, Render, Subscription, Window};
-use gpui_component::table::TableState;
+use gpui::{
+    AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, Render, Subscription, Window,
+};
+use gpui_component::{
+    dock::{Panel, PanelEvent},
+    table::TableState,
+};
 use liketrain_core::{
     SectionId,
     ui::{UiEvent, UiSectionEvent},
@@ -7,18 +12,23 @@ use liketrain_core::{
 
 use crate::{
     controller::ControllerUiWrapper,
-    window::controls::section::table::{SectionsTableData, SectionsTableDelegate},
+    window::controls::{
+        panel_type::ControlsWindowPanelType,
+        panels::section::table::{SectionsTableData, SectionsTableDelegate},
+    },
 };
 
 mod table;
 
-pub struct SectionsTab {
+pub struct SectionsPanel {
+    focus_handle: FocusHandle,
+
     table_state: Entity<TableState<SectionsTableDelegate>>,
 
     _subscriptions: Vec<Subscription>,
 }
 
-impl SectionsTab {
+impl SectionsPanel {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let table_state = cx.new(|cx| {
             let controller_state = ControllerUiWrapper::state(cx).read(cx);
@@ -61,6 +71,7 @@ impl SectionsTab {
         )];
 
         Self {
+            focus_handle: cx.focus_handle(),
             table_state,
             _subscriptions,
         }
@@ -101,12 +112,33 @@ impl SectionsTab {
     }
 }
 
-impl Render for SectionsTab {
+impl Render for SectionsPanel {
     fn render(
         &mut self,
         _window: &mut gpui::Window,
         _cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
         self.table_state.clone()
+    }
+}
+
+impl EventEmitter<PanelEvent> for SectionsPanel {}
+impl Focusable for SectionsPanel {
+    fn focus_handle(&self, _cx: &gpui::App) -> gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Panel for SectionsPanel {
+    fn panel_name(&self) -> &'static str {
+        ControlsWindowPanelType::Sections.panel_name()
+    }
+
+    fn title(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl gpui::IntoElement {
+        "Sections"
+    }
+
+    fn closable(&self, _cx: &gpui::App) -> bool {
+        false
     }
 }

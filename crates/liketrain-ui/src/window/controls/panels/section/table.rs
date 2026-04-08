@@ -165,7 +165,7 @@ impl TableDelegate for SectionsTableDelegate {
         let col = &self.columns[col_ix];
 
         match col.key.as_str() {
-            "id" => row.id.to_string().into_any_element(),
+            "id" => format!("S{}", row.id).into_any_element(),
             "occupant" => row
                 .occupant
                 .train_id()
@@ -177,7 +177,7 @@ impl TableDelegate for SectionsTableDelegate {
                             ControllerUiWrapper::state(cx)
                                 .read(cx)
                                 .train(id)
-                                .map(|data| data.name.clone())
+                                .map(|train| train.data.name.clone())
                                 .unwrap_or_else(|| id.to_string()),
                         )
                 })
@@ -190,7 +190,7 @@ impl TableDelegate for SectionsTableDelegate {
                     ControllerUiWrapper::state(cx)
                         .read(cx)
                         .train(*id)
-                        .map(|data| data.name.clone())
+                        .map(|train| train.data.name.clone())
                         .unwrap_or_else(|| id.to_string())
                 })
                 .unwrap_or_else(|| "-".to_string())
@@ -202,7 +202,7 @@ impl TableDelegate for SectionsTableDelegate {
                     ControllerUiWrapper::state(cx)
                         .read(cx)
                         .train(*id)
-                        .map(|data| data.name.clone())
+                        .map(|train| train.data.name.clone())
                         .unwrap_or_else(|| id.to_string())
                 })
                 .collect::<Vec<_>>()

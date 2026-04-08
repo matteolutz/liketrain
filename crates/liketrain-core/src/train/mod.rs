@@ -60,6 +60,13 @@ impl Train {
         &self.data.name
     }
 
+    pub fn route(&self) -> Option<&Route> {
+        match &self.mode {
+            TrainDrivingMode::Route { route, .. } => Some(route),
+            _ => None,
+        }
+    }
+
     pub fn driving_mode(&self) -> &TrainDrivingMode {
         &self.mode
     }
