@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     SectionId, SectionTransitionSwitchChange, SwitchId, SwitchState, Track, Train, TrainId,
+    TrainState,
     controller::comm::{ControllerHardwareCommunication, ControllerHardwareCommunicationChannels},
     ui::{UiCommand, UiEvent, UiSectionEvent, UiSwitchEvent, UiTrainEvent},
 };
@@ -343,6 +344,7 @@ impl Controller {
                 });
 
                 let train = self.train(train_id)?;
+                let current_train_speed = train.speed();
 
                 if let Some(transition) = train.get_transition_to_next_section().cloned() {
                     let next_section = transition.destination();
@@ -371,10 +373,13 @@ impl Controller {
                             })?;
                         }
 
+                        // get the next section power from the trains speed
+                        let next_section_power = current_train_speed.into();
+
                         // then set power to next section
                         ctx.exec(HardwareCommand::SetSectionPower {
                             section_id: next_section.as_u32(),
-                            power: HardwareSectionPower::Full,
+                            power: next_section_power,
                         })?;
                     } else {
                         // stop the train
@@ -382,6 +387,15 @@ impl Controller {
                             section_id: current_section_id.as_u32(),
                             power: HardwareSectionPower::Off,
                         })?;
+
+                        self.trains
+                            .get_mut(&train_id)
+                            .unwrap()
+                            .set_state(TrainState::Waiting);
+                        self.emit_ui(UiTrainEvent::StateChanged {
+                            train_id,
+                            state: TrainState::Waiting,
+                        });
 
                         // append it to the waiting trains
                         self.section_queues
@@ -419,6 +433,7 @@ impl Controller {
                     // this means, either the section was occupied before
                     // or there was another train inbound
                     let train = self.trains.get(&waiting_train_id).unwrap();
+                    let current_train_speed = train.speed();
 
                     if train
                         .get_next_section()
@@ -434,11 +449,24 @@ impl Controller {
 
                     self.try_reserve_section(section_id, train_id);
 
+                    // get the next section power from the trains speed
+                    let section_power = current_train_speed.into();
+
                     // restart the train (repower its current section)
                     ctx.exec(HardwareCommand::SetSectionPower {
                         section_id: current_section.as_u32(),
-                        power: HardwareSectionPower::Full,
+                        power: section_power,
                     })?;
+
+                    // also update the state (we are not on `Waiting` anymore)
+                    self.trains
+                        .get_mut(&train_id)
+                        .unwrap()
+                        .set_state(TrainState::Default);
+                    self.emit_ui(UiTrainEvent::StateChanged {
+                        train_id,
+                        state: TrainState::Default,
+                    });
 
                     // set required switches to the next section
                     for SectionTransitionSwitchChange {
@@ -457,7 +485,7 @@ impl Controller {
                     // power the next section
                     ctx.exec(HardwareCommand::SetSectionPower {
                         section_id: section_id.as_u32(),
-                        power: HardwareSectionPower::Full,
+                        power: section_power,
                     })?;
 
                     return Ok(());
@@ -468,6 +496,11 @@ impl Controller {
                     section_id: section_id.as_u32(),
                     power: HardwareSectionPower::Off,
                 })?;
+            }
+            ScheduledEvent::TrainSpeedChanged { .. } => {
+                // TODO: update the power for the trains current and reserved sections
+                // the problem with this currently is, that we don't know if the train maybe is
+                // waiting (section powered off). In this case we should not update the power.
             }
         }
 
@@ -514,6 +547,18 @@ impl Controller {
                     switch_id: switch_id.try_into().unwrap(),
                     state: state.into(),
                 })?;
+            }
+            UiCommand::SetTrainSpeed { train_id, speed } => {
+                if let Some(train) = self.trains.get_mut(&train_id) {
+                    train.set_speed(speed);
+
+                    // this scheduled event will re-set the power for the section that is currently
+                    // occupied by the train and any section that is reserved for this train
+                    self.scheduler
+                        .schedule_now(ScheduledEvent::TrainSpeedChanged { train_id, speed });
+
+                    self.emit_ui(UiTrainEvent::SpeedChanged { train_id, speed });
+                }
             }
         }
 

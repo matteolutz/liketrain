@@ -1,6 +1,12 @@
 mod mode;
 pub use mode::*;
 
+mod speed;
+pub use speed::*;
+
+mod state;
+pub use state::*;
+
 use crate::{Direction, Route, SectionEnd, SectionId, SectionTransition};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -39,6 +45,9 @@ pub struct TrainData {
 pub struct Train {
     data: TrainData,
 
+    speed: TrainSpeed,
+    state: TrainState,
+
     mode: TrainDrivingMode,
 }
 
@@ -46,6 +55,8 @@ impl Train {
     pub fn from_route(name: impl Into<String>, route: Route) -> Self {
         Self {
             data: TrainData { name: name.into() },
+            speed: TrainSpeed::default(),
+            state: TrainState::default(),
             mode: route.into(),
         }
     }
@@ -60,9 +71,26 @@ impl Train {
         &self.data.name
     }
 
+    pub fn speed(&self) -> TrainSpeed {
+        self.speed
+    }
+
+    pub fn set_speed(&mut self, speed: TrainSpeed) {
+        self.speed = speed;
+    }
+
+    pub fn state(&self) -> TrainState {
+        self.state
+    }
+
+    pub fn set_state(&mut self, state: TrainState) {
+        self.state = state;
+    }
+
     pub fn route(&self) -> Option<&Route> {
         match &self.mode {
             TrainDrivingMode::Route { route, .. } => Some(route),
+            #[allow(unreachable_patterns)]
             _ => None,
         }
     }

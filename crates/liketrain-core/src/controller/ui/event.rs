@@ -3,7 +3,7 @@ use liketrain_hardware::{
     event::{HardwareSectionPower, SectionEvent},
 };
 
-use crate::{SectionId, SwitchId, SwitchState, TrainId};
+use crate::{SectionId, SwitchId, SwitchState, TrainId, TrainSpeed, TrainState};
 
 #[derive(Debug, Clone)]
 pub enum UiSectionEvent {
@@ -49,6 +49,16 @@ pub enum UiTrainEvent {
     EnteredSection {
         train_id: TrainId,
         section_id: SectionId,
+    },
+
+    SpeedChanged {
+        train_id: TrainId,
+        speed: TrainSpeed,
+    },
+
+    StateChanged {
+        train_id: TrainId,
+        state: TrainState,
     },
 
     Stopped {

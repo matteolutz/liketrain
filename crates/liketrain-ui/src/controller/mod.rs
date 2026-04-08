@@ -187,6 +187,12 @@ impl ControllerUiWrapperState {
             } => {
                 self.trains.get_mut(&train_id).unwrap().current_section = Some(section_id);
             }
+            UiTrainEvent::SpeedChanged { train_id, speed } => {
+                self.trains.get_mut(&train_id).unwrap().speed = speed;
+            }
+            UiTrainEvent::StateChanged { train_id, state } => {
+                self.trains.get_mut(&train_id).unwrap().state = state;
+            }
             _ => todo!(),
         }
     }

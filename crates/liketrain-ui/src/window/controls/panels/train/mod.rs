@@ -36,6 +36,9 @@ impl TrainsPanel {
                 TrainsTableDelegate::new(controller_state.trains().map(|(train_id, train)| {
                     TrainsTableData {
                         id: train_id,
+                        name: train.data.name.clone().into(),
+                        speed: train.speed,
+                        state: train.state,
                         current_section: train.current_section,
                     }
                 })),
@@ -47,10 +50,12 @@ impl TrainsPanel {
         let _subscriptions = vec![cx.subscribe(
             &ControllerUiWrapper::state(cx).clone(),
             |this, _, evt, cx| match evt {
-                UiEvent::UiTrainEvent(train_event) => match train_event {
-                    &UiTrainEvent::EnteredSection { train_id, .. } => {
+                UiEvent::UiTrainEvent(train_event) => match *train_event {
+                    UiTrainEvent::EnteredSection { train_id, .. } => {
                         this.update_current_section(train_id, cx)
                     }
+                    UiTrainEvent::SpeedChanged { train_id, .. } => this.update_speed(train_id, cx),
+                    UiTrainEvent::StateChanged { train_id, .. } => this.update_state(train_id, cx),
                     _ => {}
                 },
                 _ => {}
@@ -67,6 +72,22 @@ impl TrainsPanel {
     fn update_current_section(&self, train_id: TrainId, cx: &mut Context<Self>) {
         self.table_state.update(cx, |state, cx| {
             state.delegate_mut().update_current_section(train_id, cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn update_speed(&self, train_id: TrainId, cx: &mut Context<Self>) {
+        self.table_state.update(cx, |state, cx| {
+            state.delegate_mut().update_speed(train_id, cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn update_state(&self, train_id: TrainId, cx: &mut Context<Self>) {
+        self.table_state.update(cx, |state, cx| {
+            state.delegate_mut().update_state(train_id, cx);
             cx.notify();
         });
         cx.notify();

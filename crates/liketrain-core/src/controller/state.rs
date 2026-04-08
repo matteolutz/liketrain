@@ -13,6 +13,10 @@ impl SectionState {
         self.occupied.is_some()
     }
 
+    pub fn is_occupied_by(&self, train_id: TrainId) -> bool {
+        self.occupied == Some(train_id)
+    }
+
     pub fn occupant(&self) -> Option<TrainId> {
         self.occupied
     }

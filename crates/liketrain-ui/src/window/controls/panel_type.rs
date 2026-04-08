@@ -34,9 +34,9 @@ impl ControlsWindowPanelType {
             Self::Sections => Arc::new(cx.new(|cx| SectionsPanel::new(window, cx))),
             Self::Switches => Arc::new(cx.new(|cx| SwitchesPanel::new(window, cx))),
             Self::Trains => Arc::new(cx.new(|cx| TrainsPanel::new(window, cx))),
-            Self::Controller => Arc::new(cx.new(|cx| ControllerPanel::new(cx))),
-            Self::Layout => Arc::new(cx.new(|cx| LayoutPanel::new(cx))),
-            Self::Logs => Arc::new(cx.new(|cx| LogsPanel::new(cx))),
+            Self::Controller => Arc::new(cx.new(ControllerPanel::new)),
+            Self::Layout => Arc::new(cx.new(LayoutPanel::new)),
+            Self::Logs => Arc::new(cx.new(LogsPanel::new)),
         }
     }
 }

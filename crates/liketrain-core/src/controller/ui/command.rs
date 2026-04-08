@@ -1,6 +1,6 @@
 use liketrain_hardware::event::HardwareSectionPower;
 
-use crate::{SectionId, SwitchId, SwitchState};
+use crate::{SectionId, SwitchId, SwitchState, TrainId, TrainSpeed};
 
 #[derive(Debug, Clone)]
 pub enum UiCommand {
@@ -12,5 +12,10 @@ pub enum UiCommand {
     SetSwitchState {
         switch_id: SwitchId,
         state: SwitchState,
+    },
+
+    SetTrainSpeed {
+        train_id: TrainId,
+        speed: TrainSpeed,
     },
 }

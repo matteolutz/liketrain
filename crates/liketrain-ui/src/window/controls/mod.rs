@@ -1,6 +1,5 @@
 use gpui::{AppContext, Context, Entity, ParentElement, Render, Styled, Subscription, Window, div};
 use gpui_component::dock::{DockArea, DockPlacement, PanelStyle};
-use strum::IntoEnumIterator;
 
 use crate::{
     app_ext::GpuiContextExtension, controller::ControllerUiWrapper,
@@ -24,15 +23,50 @@ impl ControlsWindow {
             let mut da =
                 DockArea::new("dock-area", Some(5), window, cx).panel_style(PanelStyle::TabBar);
 
-            for panel in ControlsWindowPanelType::iter() {
-                da.add_panel(
-                    panel.build_panel_view(window, cx),
-                    DockPlacement::Center,
-                    None,
-                    window,
-                    cx,
-                );
-            }
+            da.add_panel(
+                ControlsWindowPanelType::Sections.build_panel_view(window, cx),
+                DockPlacement::Center,
+                None,
+                window,
+                cx,
+            );
+            da.add_panel(
+                ControlsWindowPanelType::Switches.build_panel_view(window, cx),
+                DockPlacement::Center,
+                None,
+                window,
+                cx,
+            );
+            da.add_panel(
+                ControlsWindowPanelType::Trains.build_panel_view(window, cx),
+                DockPlacement::Center,
+                None,
+                window,
+                cx,
+            );
+            da.add_panel(
+                ControlsWindowPanelType::Layout.build_panel_view(window, cx),
+                DockPlacement::Center,
+                None,
+                window,
+                cx,
+            );
+
+            da.add_panel(
+                ControlsWindowPanelType::Logs.build_panel_view(window, cx),
+                DockPlacement::Right,
+                None,
+                window,
+                cx,
+            );
+
+            da.add_panel(
+                ControlsWindowPanelType::Controller.build_panel_view(window, cx),
+                DockPlacement::Bottom,
+                None,
+                window,
+                cx,
+            );
 
             da
         });
