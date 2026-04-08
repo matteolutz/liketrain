@@ -1,13 +1,18 @@
 use std::{collections::HashMap, time::Duration};
 
 use gpui::{
-    Context, Div, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels, Render,
-    ScrollHandle, Size, StatefulInteractiveElement, Styled, Task, Window, div,
+    Context, Div, Element, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels,
+    Render, ScrollHandle, Size, StatefulInteractiveElement, Styled, Task, Window, div,
     prelude::FluentBuilder, px, size,
 };
 
 mod theme;
-use liketrain_core::{Route, SectionTransition, SwitchId, Track, TrainId};
+use gpui_component::{StyledExt, h_flex};
+use itertools::Itertools;
+use liketrain_core::{
+    Direction, Route, SectionEnd, SectionTransition, SwitchId, Track, TrackSectionWaypointType,
+    TrainId,
+};
 pub use theme::*;
 
 use crate::controller::ControllerUiWrapper;
@@ -50,18 +55,39 @@ impl EbulaOffset {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum EbulaEntry {
     Switch(SwitchId),
-    Waypoint,
+    Waypoint(TrackSectionWaypointType),
 }
 
 impl EbulaEntry {
     pub fn switch_id(&self) -> Option<&SwitchId> {
         match self {
             EbulaEntry::Switch(id) => Some(id),
-            EbulaEntry::Waypoint => None,
+            _ => None,
         }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct EbulaEntries(HashMap<EbulaOffset, Vec<EbulaEntry>>);
+
+impl EbulaEntries {
+    pub fn get_slice(&self, offset: &EbulaOffset) -> &[EbulaEntry] {
+        self.0.get(offset).map(|v| v.as_slice()).unwrap_or_default()
+    }
+
+    pub fn insert(&mut self, offset: EbulaOffset, entry: EbulaEntry) {
+        self.0.entry(offset).or_default().push(entry);
+    }
+
+    pub fn offsets(&self) -> impl Iterator<Item = EbulaOffset> {
+        self.0.keys().copied()
+    }
+
+    pub fn offset_range(&self) -> Option<(EbulaOffset, EbulaOffset)> {
+        self.offsets().minmax().into_option()
     }
 }
 
@@ -73,7 +99,7 @@ pub struct Ebula {
     train_id: TrainId,
 
     /// The precalculated entries. Sorted by offset.
-    entries: HashMap<EbulaOffset, EbulaEntry>,
+    entries: EbulaEntries,
 
     content_scroll_handle: ScrollHandle,
 
@@ -121,19 +147,29 @@ impl Ebula {
         }
     }
 
-    fn calculate_entries(track: &Track, route: &Route) -> HashMap<EbulaOffset, EbulaEntry> {
-        let mut entries = HashMap::new();
+    fn calculate_entries(track: &Track, route: &Route) -> EbulaEntries {
+        let mut entries = EbulaEntries::default();
         let mut current_meter_offset = 0_f32;
 
+        let mut current_section_direction = route.starting_direction();
         for (section_id, trans) in route.vias_with_transition() {
             let Some(section_geo) = track.section_geo(&section_id) else {
                 continue;
             };
 
-            for _waypoint in section_geo.waypoints.iter() {}
+            for waypoint in section_geo.waypoints.iter() {
+                let waypoint_offset = match current_section_direction {
+                    Direction::Forward => waypoint.at_meter,
+                    Direction::Backward => section_geo.length - waypoint.at_meter,
+                };
+
+                entries.insert(
+                    EbulaOffset::from_m(current_meter_offset + waypoint_offset),
+                    EbulaEntry::Waypoint(waypoint.r#type.clone()),
+                );
+            }
 
             current_meter_offset += section_geo.length;
-            log::debug!("current_meter_offset = {}", current_meter_offset);
 
             match trans {
                 SectionTransition::Switch { switch_id, .. }
@@ -144,6 +180,11 @@ impl Ebula {
                     );
                 }
                 _ => {}
+            }
+
+            current_section_direction = match trans.destination_section_end() {
+                SectionEnd::Start => Direction::Forward,
+                SectionEnd::End => Direction::Backward,
             }
         }
 
@@ -295,8 +336,9 @@ impl Ebula {
         _window: &mut Window,
         _cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let min_offset = self.entries.keys().copied().min().unwrap_or_default();
-        let max_offset = self.entries.keys().copied().max().unwrap_or_default();
+        /*let min_offset = self.entries.keys().copied().min().unwrap_or_default();
+        let max_offset = self.entries.keys().copied().max().unwrap_or_default();*/
+        let (min_offset, max_offset) = self.entries.offset_range().unwrap_or_default();
 
         div()
             .w_full()
@@ -324,7 +366,9 @@ impl Ebula {
                             // .overflow_y_scrollbar()
                             .children((min_offset.0..=max_offset.0).map(|offset| {
                                 let offset = EbulaOffset(offset);
-                                let entry = self.entries.get(&offset);
+                                let entries = self.entries.get_slice(&offset);
+
+                                let is_switch = entries.iter().any(|e| e.switch_id().is_some());
 
                                 div()
                                     .w_full()
@@ -334,10 +378,14 @@ impl Ebula {
                                     .child(self.m_field(offset.m(), BorderSide::Right).w_24()) // km
                                     .child(div().w_3()) // the line ?
                                     .child(
-                                        div().h_full().flex().items_center().w_3().when_some(
-                                            entry.and_then(|e| e.switch_id()),
-                                            |this, _| this.font_weight(FontWeight::BOLD).child("¥"),
-                                        ),
+                                        div()
+                                            .h_full()
+                                            .flex()
+                                            .items_center()
+                                            .w_3()
+                                            .when(is_switch, |this| {
+                                                this.font_weight(FontWeight::BOLD).child("¥")
+                                            }),
                                     ) // symbols
                                     .child(
                                         div()
@@ -345,21 +393,60 @@ impl Ebula {
                                             .when(true, |this| self.border_right(this))
                                             .h_full()
                                             .child(
-                                                div()
+                                                h_flex()
                                                     .size_full()
                                                     .border_t_2()
                                                     .border_color(self.theme.foreground.alpha(0.2))
                                                     .h_full()
-                                                    .when_some(entry, |this, entry| {
-                                                        this.child(match entry {
-                                                            EbulaEntry::Switch(switch_id) => {
-                                                                switch_id.to_string()
-                                                            }
-                                                            EbulaEntry::Waypoint => {
-                                                                "Waypoint".to_string()
-                                                            }
-                                                        })
-                                                    }),
+                                                    .gap_2()
+                                                    .children(entries.iter().enumerate().map(
+                                                        |(idx, e)| {
+                                                            let is_last = idx == entries.len() - 1;
+
+                                                            div()
+                                                                .when(!is_last, |div| {
+                                                                    div.pr_2()
+                                                                        .border_r_2()
+                                                                        .border_color(
+                                                                            self.theme
+                                                                                .foreground
+                                                                                .alpha(0.2),
+                                                                        )
+                                                                })
+                                                                .child(match e {
+                                                                    EbulaEntry::Switch(
+                                                                        switch_id,
+                                                                    ) => switch_id
+                                                                        .to_string()
+                                                                        .into_any_element(),
+                                                                    EbulaEntry::Waypoint(
+                                                                        waypoint_type,
+                                                                    ) => div()
+                                                                        .child(
+                                                                            waypoint_type
+                                                                                .to_string(),
+                                                                        )
+                                                                        .when(
+                                                                            waypoint_type
+                                                                                .should_highlight(),
+                                                                            |div| div.font_bold(),
+                                                                        )
+                                                                        .into_any_element(),
+                                                                })
+                                                        },
+                                                    )), /*.child(
+                                                            self.entries
+                                                                .get(&offset)
+                                                                .map(|e| match e {
+                                                                    EbulaEntry::Switch(switch_id) => {
+                                                                        switch_id.to_string()
+                                                                    }
+                                                                    EbulaEntry::Waypoint(
+                                                                        waypoint_type,
+                                                                    ) => waypoint_type.to_string(),
+                                                                })
+                                                                .join(", "),
+                                                        ),*/
                                             )
                                             .px_2(),
                                     ) // name

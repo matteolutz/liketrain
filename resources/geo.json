@@ -11,7 +11,15 @@
     "S9": { "length": 54.8 },
     "S10": { "length": 146.6 },
     "S11": { "length": 71.5 },
-    "S12": { "length": 71.9 },
+    "S12": {
+      "length": 71.9,
+      "waypoints": [
+        {
+          "at_meter": 45.0,
+          "type": { "Station": { "name": "KMG HBf" } }
+        }
+      ]
+    },
     "S13": { "length": 122.9 },
     "S14": { "length": 15.1 },
     "S15": { "length": 97.0 },
