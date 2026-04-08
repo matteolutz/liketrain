@@ -154,7 +154,7 @@ impl Layout {
                             .unwrap()
                             .get_mut(resolution_end);
 
-                        if let Some(layout_section) = self.sections.get(&(section_id.into())) {
+                        if let Some(layout_section) = self.sections.get(&section_id) {
                             let section_end_point = match section_end {
                                 SectionEnd::Start => layout_section.from,
                                 SectionEnd::End => layout_section.to(),

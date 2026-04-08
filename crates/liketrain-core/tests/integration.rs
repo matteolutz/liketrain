@@ -2,12 +2,12 @@ use std::sync::mpsc;
 
 use chumsky::Parser;
 use liketrain_core::{
-    Controller, ControllerConfig, Direction, Route, Train,
-    comm::SerialControllerHardwareCommunication,
+    Controller, ControllerConfig, Direction, Route, TrackGeometry, Train,
+    comm::{SerialControllerHardwareCommunication, SimHardwareCommunication, SimTrain},
     parser::{eval::Evaluator, parser},
 };
 
-const TTL: &str = r#"
+const LTT: &str = r#"
 
         S23:    -> switch(M)            | <- back(N, right)
         S25:    -> back(L, left)        | <- back(M, right)
@@ -47,7 +47,7 @@ const TTL: &str = r#"
 
 #[test]
 fn test_route_validation() {
-    let result = parser().parse(TTL).into_result();
+    let result = parser().parse(LTT).into_result();
     let track_defs = result.unwrap();
 
     let eval = Evaluator::default();
@@ -86,20 +86,30 @@ fn test_controller() {
 
     log::debug!("testing logger");
 
-    let result = parser().parse(TTL).into_result();
+    let result = parser().parse(LTT).into_result();
     let track_defs = result.unwrap();
 
     let eval = Evaluator::default();
-    let track = eval.evaluate(track_defs).unwrap();
+    let mut track = eval.evaluate(track_defs).unwrap();
 
-    let Some(r1) = Route::new("RE5", [16_usize, 15], Direction::Forward, &track) else {
+    let track_geo = include_str!("../../../resources/geo.json");
+    let track_geo: TrackGeometry = serde_json::from_str(track_geo).unwrap();
+    track.set_geometry(track_geo);
+
+    let Some(r1) = Route::new(
+        "RE5",
+        [12_usize, 14, 16, 9, 10, 12],
+        Direction::Backward,
+        &track,
+    ) else {
         assert!(false, "Route 1 failed");
         return;
     };
 
     println!("Route 1 valid: {}", r1.pretty_print(&track));
 
-    let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
+    // let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
+    let hardware_comm = SimHardwareCommunication::new([SimTrain::from_route(&r1, &track, 10.0)]);
 
     let controller_config = ControllerConfig {
         track,

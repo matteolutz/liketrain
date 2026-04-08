@@ -103,7 +103,7 @@ impl<'de> Deserialize<'de> for SectionId {
                     let id = id_str
                         .parse::<usize>()
                         .map_err(|_| E::custom("invalid number in section id"))?;
-                    Ok(SectionId(id.into()))
+                    Ok(SectionId(id))
                 } else {
                     Err(E::custom("section id must start with 'S'"))
                 }

@@ -6,7 +6,8 @@ use gpui::{
 use gpui_component::Root;
 use liketrain_core::{
     ControllerConfig, Direction, Route, Track, TrackGeometry, Train, TrainId,
-    comm::SerialControllerHardwareCommunication, parser::Parser,
+    comm::{SerialControllerHardwareCommunication, SimHardwareCommunication, SimTrain},
+    parser::Parser,
 };
 
 use crate::{
@@ -76,8 +77,16 @@ fn main() {
 
     log::info!("layout: {:#?}", resolved_layout);
 
-    let test_route = Route::new("RE5", [16_usize, 15], Direction::Forward, &track).unwrap();
-    let test_train = Train::from_route("4218", test_route);
+    let test_route = Route::new(
+        "RE5",
+        [12_usize, 14, 16, 9, 10, 12],
+        Direction::Backward,
+        &track,
+    )
+    .unwrap();
+
+    let test_sim_train = SimTrain::from_route(&test_route, &track, 8.0);
+    let test_train = Train::from_route("RE5", test_route);
 
     let controller_config = ControllerConfig {
         track: track.as_ref().clone(),
@@ -86,7 +95,8 @@ fn main() {
             .collect(),
     };
 
-    let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
+    // let hardware_comm = SerialControllerHardwareCommunication::new("/dev/cu.usbmodem11401", 115200);
+    let hardware_comm = SimHardwareCommunication::new([test_sim_train]);
 
     gpui_platform::application()
         .with_assets(assets::Assets)

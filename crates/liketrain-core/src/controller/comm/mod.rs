@@ -3,8 +3,8 @@ use liketrain_hardware::{command::HardwareCommand, event::HardwareEvent};
 mod serial;
 pub use serial::*;
 
-// mod sim;
-// pub use sim::*;
+mod sim;
+pub use sim::*;
 
 mod flow;
 
@@ -15,7 +15,7 @@ pub struct ControllerHardwareCommunicationChannels {
     pub command_rx: crossbeam::channel::Receiver<HardwareCommand>,
 }
 
-pub trait ControllerHardwareCommunication {
+pub trait ControllerHardwareCommunication: 'static + Send {
     /// Start the communication with the controller
     fn start(
         &self,

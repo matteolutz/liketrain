@@ -16,7 +16,7 @@ impl SwitchId {
     }
 
     pub fn from_hardware_id(id: &HardwareSwitchId) -> Self {
-        let switch_id_str = str::from_utf8(id).unwrap();
+        let switch_id_str = std::str::from_utf8(id.split(|&b| b == 0).next().unwrap()).unwrap();
         switch_id_str.into()
     }
 }

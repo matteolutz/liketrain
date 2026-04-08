@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, Styled};
+use gpui::{App, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
 use gpui_component::{
+    ActiveTheme,
     button::Button,
     menu::{DropdownMenu, PopupMenuItem},
     table::{Column, ColumnSort, TableDelegate},
@@ -9,7 +10,7 @@ use gpui_component::{
 use itertools::Itertools;
 use liketrain_core::{SectionId, TrainId, hardware::event::HardwareSectionPower, ui::UiCommand};
 
-use crate::controller::ControllerUiWrapper;
+use crate::controller::{ControllerUiWrapper, UiSectionOccupant};
 
 const ALL_SECTION_POWERS: [HardwareSectionPower; 5] = [
     HardwareSectionPower::Off,
@@ -22,7 +23,7 @@ const ALL_SECTION_POWERS: [HardwareSectionPower; 5] = [
 pub struct SectionsTableData {
     pub id: SectionId,
 
-    pub occupant: Option<TrainId>,
+    pub occupant: UiSectionOccupant,
     pub reservation: Option<TrainId>,
     pub queue: Vec<TrainId>,
 
@@ -167,15 +168,20 @@ impl TableDelegate for SectionsTableDelegate {
             "id" => row.id.to_string().into_any_element(),
             "occupant" => row
                 .occupant
-                .as_ref()
-                .map(|id| {
-                    ControllerUiWrapper::state(cx)
-                        .read(cx)
-                        .train(*id)
-                        .map(|data| data.name.clone())
-                        .unwrap_or_else(|| id.to_string())
+                .train_id()
+                .map(|(id, was_freed)| {
+                    div()
+                        .when(was_freed, |this| this.text_color(cx.theme().danger))
+                        .when(!was_freed, |this| this.text_color(cx.theme().success))
+                        .child(
+                            ControllerUiWrapper::state(cx)
+                                .read(cx)
+                                .train(id)
+                                .map(|data| data.name.clone())
+                                .unwrap_or_else(|| id.to_string()),
+                        )
                 })
-                .unwrap_or_else(|| "-".to_string())
+                .unwrap_or_else(|| div().child("-".to_string()))
                 .into_any_element(),
             "reservation" => row
                 .reservation

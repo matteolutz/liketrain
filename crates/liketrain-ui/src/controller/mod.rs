@@ -4,9 +4,9 @@ use gpui::{
     App, AppContext, BorrowAppContext, Context, Entity, EventEmitter, Global, SharedString, Task,
 };
 use liketrain_core::{
-    Controller, ControllerConfig, ControllerError, SectionId, SwitchId, SwitchState, Track,
-    TrainData, TrainId,
+    Controller, ControllerConfig, SectionId, SwitchId, SwitchState, Track, TrainData, TrainId,
     comm::ControllerHardwareCommunication,
+    hardware::event::SectionEventType,
     ui::{UiCommand, UiEvent, UiSectionEvent, UiSwitchEvent, UiTrainEvent},
 };
 
@@ -83,7 +83,7 @@ impl ControllerUiWrapperState {
                         id,
                         UiSectionState {
                             power: state.power(),
-                            occupant: state.occupant(),
+                            occupant: state.occupant().into(),
                             reserved_by: reservation,
                             queue,
                         },
@@ -100,7 +100,7 @@ impl ControllerUiWrapperState {
                 section_id,
                 train_id,
             } => {
-                self.section_states.entry(section_id).or_default().occupant = train_id;
+                self.section_states.entry(section_id).or_default().occupant = train_id.into();
             }
             UiSectionEvent::Reserved {
                 section_id,
@@ -134,7 +134,19 @@ impl ControllerUiWrapperState {
                     .queue
                     .retain(|id| id != &train_id);
             }
-            UiSectionEvent::HardwareSectionEvent(_) => {}
+            UiSectionEvent::HardwareSectionEvent(hw_section_event) => {
+                match hw_section_event.event_type {
+                    SectionEventType::Freed => {
+                        // only used in the ui
+                        self.section_states
+                            .entry(hw_section_event.section_id.into())
+                            .or_default()
+                            .occupant
+                            .was_freed();
+                    }
+                    SectionEventType::Occupied => {}
+                }
+            }
         }
     }
 
@@ -175,7 +187,7 @@ pub struct ControllerUiWrapper {
 
     command_tx: crossbeam::channel::Sender<UiCommand>,
 
-    task: Option<Task<()>>,
+    _task: Option<Task<()>>,
 }
 
 impl ControllerUiWrapper {
@@ -193,6 +205,7 @@ impl ControllerUiWrapper {
 
         let _task = cx.spawn({
             let controller_state = controller_state.clone();
+
             async move |cx| {
                 loop {
                     cx.background_executor()
@@ -210,7 +223,7 @@ impl ControllerUiWrapper {
             controller: Some(controller),
             command_tx,
             controller_state,
-            task: None,
+            _task: Some(_task),
         }
     }
 
@@ -218,14 +231,15 @@ impl ControllerUiWrapper {
         cx.global::<Self>().controller.is_some()
     }
 
-    pub fn start(cx: &mut App) -> Result<(), ControllerError> {
+    pub fn start(cx: &mut App) {
         cx.update_global(|this: &mut Self, _| {
             let controller = this
                 .controller
                 .take()
                 .expect("controller should be present. Please only call start() once");
-            controller.start()
-        })
+
+            std::thread::spawn(move || controller.start());
+        });
     }
 
     pub fn exec(command: impl Into<UiCommand>, cx: &App) {

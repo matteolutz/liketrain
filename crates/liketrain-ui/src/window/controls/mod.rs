@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder,
 };
 use gpui_component::{
-    Disableable, WindowExt,
+    Disableable,
     button::Button,
     tab::{Tab, TabBar},
 };
@@ -53,15 +53,12 @@ impl Render for ControlsWindow {
                 Button::new("start")
                     .label("Start")
                     .disabled(!ControllerUiWrapper::can_start(cx))
-                    .on_click(|_, window, cx| {
+                    .on_click(|_, _, cx| {
                         if !ControllerUiWrapper::can_start(cx) {
                             return;
                         }
 
-                        if let Err(err) = ControllerUiWrapper::start(cx) {
-                            window.push_notification(err.to_string(), cx);
-                            log::warn!("Failed to start: {}", err);
-                        }
+                        ControllerUiWrapper::start(cx);
                     }),
             )
             .child(

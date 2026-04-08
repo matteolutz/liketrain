@@ -248,6 +248,14 @@ impl Controller {
 
             let (inbound_train_id, inbound_train) = &mut inbound_trains[0];
 
+            if let Some(inbound_train_curent_section) = inbound_train.get_current_section() {
+                self.scheduler
+                    .schedule_now(ScheduledEvent::TrainLeftSection {
+                        train_id: **inbound_train_id,
+                        section_id: inbound_train_curent_section,
+                    });
+            }
+
             // it's just one train, so this must be the train that just entered this section
             inbound_train.entered_section(section_id);
             self.scheduler
@@ -258,14 +266,9 @@ impl Controller {
 
             state.occupied = Some(**inbound_train_id);
         } else {
-            // if this section was occupied, send TrainLeftSection
-            if let Some(previous_occupied) = previous_occupied {
-                self.scheduler
-                    .schedule_now(ScheduledEvent::TrainLeftSection {
-                        train_id: previous_occupied,
-                        section_id,
-                    });
-            }
+            // Don't emit a TrainLeftSection event right here.
+            // If we stop a train because it has to wait, the hardware
+            // will also emit a SectionFreed event
         }
     }
 
@@ -596,6 +599,7 @@ impl Controller {
         Ok(())
     }
 
+    #[allow(unused)]
     fn test_switch(switch_id: SwitchId, ctx: EventExecutionContext) -> Result<(), ControllerError> {
         log::debug!("Testing switch: {}", switch_id);
 
@@ -609,11 +613,12 @@ impl Controller {
             state: liketrain_hardware::event::HardwareSwitchState::Left,
         })?;
 
-        std::thread::sleep(Duration::from_secs(5));
+        std::thread::sleep(Duration::from_secs(2));
 
         Ok(())
     }
 
+    #[allow(unused)]
     fn test_switches(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
         for (switch_id, _) in self
             .track
@@ -626,6 +631,7 @@ impl Controller {
         Ok(())
     }
 
+    #[allow(unused)]
     fn test_section(
         section_id: SectionId,
         ctx: EventExecutionContext,
@@ -662,6 +668,7 @@ impl Controller {
         Ok(())
     }
 
+    #[allow(unused)]
     fn test_sections(&self, ctx: EventExecutionContext) -> Result<(), ControllerError> {
         for (section_id, _) in self
             .track
@@ -696,12 +703,15 @@ impl Controller {
         self.init(ctx)?;
 
         // test the sections
-        self.test_sections(ctx)?;
+        // self.test_sections(ctx)?;
         // Self::test_section(26_usize.into(), ctx)?;
 
         // test the switches
-        self.test_switches(ctx)?;
-        // Self::test_switch("O".into(), ctx)?;
+        // self.test_switches(ctx)?;
+
+        /*for _ in 0..100 {
+            Self::test_switch("B".into(), ctx)?;
+        }*/
 
         // main loop
         loop {

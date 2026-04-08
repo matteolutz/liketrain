@@ -83,7 +83,12 @@ impl Route {
         self.vias.len() > 1 && self.vias.first().unwrap() == self.vias.last().unwrap()
     }
 
-    pub fn transition(&self, idx: usize) -> Option<&SectionTransition> {
+    pub fn transition(&self, mut idx: usize) -> Option<&SectionTransition> {
+        if self.is_closed() {
+            // don't subtract 1 here, because we always have a transition less than vias
+            idx %= self.transitions.len();
+        }
+
         self.transitions.get(idx)
     }
 
